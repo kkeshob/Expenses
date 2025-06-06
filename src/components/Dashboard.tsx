@@ -1,23 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonContent,
-  IonPage,
-  IonRefresher,
-  IonRefresherContent,
-  useIonToast,
-  IonLabel
-} from '@ionic/react';
+import {  IonCard,  IonCardHeader,  IonCardTitle,  IonCardContent,  IonGrid,  IonRow,  IonCol,  IonContent,  IonPage,  IonRefresher,
+  IonRefresherContent,  useIonToast,  IonLabel} from '@ionic/react';
 import { Pie, Bar } from 'react-chartjs-2';
 import { db, Expense } from '../db';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
-
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
 function debounce<T extends (...args: any[]) => void>(fn: T, delay: number) {
@@ -37,10 +23,12 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
   const [balance, setBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [present] = useIonToast();
-  const [showIncome] = useState(() => {
-    const stored = localStorage.getItem('show_income');
-    return stored === null ? true : stored === 'true';
-  });
+
+  
+  // Read showIncome from localStorage on every render
+  const showIncome = localStorage.getItem('show_income') === null
+    ? true
+    : localStorage.getItem('show_income') === 'true';
 
   // Helper to get start and end of a month
   function getMonthRange(offset = 0) {
@@ -115,7 +103,12 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
   };
 
   // Prepare data for charts (current month only)
-  const expenseByCategory = expenses
+  // Only include income if showIncome is true
+  const filteredExpenses = showIncome
+    ? expenses
+    : expenses.filter(e => e.type !== 'income');
+
+  const expenseByCategory = filteredExpenses
     .filter(e => e.type === 'expense')
     .reduce((acc, e) => {
       acc[e.category] = (acc[e.category] || 0) + e.amount;
@@ -143,7 +136,7 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
     datasets: [
       {
         label: 'Amount',
-        data: [income, expenseTotal, balance],
+        data: showIncome ? [income, expenseTotal, balance] : [0, expenseTotal, 0],
         backgroundColor: [
           'rgba(75, 192, 192, 0.7)',
           'rgba(255, 99, 132, 0.7)',
@@ -187,13 +180,7 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
                   </IonCardHeader>
                   <IonCardContent>
                     <Bar
-                      data={{
-                        ...barData,
-                        datasets: [{
-                          ...barData.datasets[0],
-                          data: showIncome ? [income, expenseTotal, balance] : [0, expenseTotal, 0]
-                        }]
-                      }}
+                      data={barData}
                       options={{
                         responsive: true,
                         plugins: {
@@ -248,8 +235,7 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
                               position: 'right',
                               labels: {
                                 color: "#444",
-                                font: { size: 12
-                                 }
+                                font: { size: 12 }
                               }
                             }
                           }

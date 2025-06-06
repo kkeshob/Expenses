@@ -22,10 +22,10 @@ import { trash, pencil } from 'ionicons/icons';
 import { db, Expense, Category } from '../db';
 import { ToastContainer, toast } from 'react-toastify';
 import Modal from 'react-modal';
-interface ReportProps{
-  marginTop:number;
+interface ReportProps {
+  marginTop: number;
 }
-const Report: React.FC<ReportProps> = ({marginTop}) => {
+const Report: React.FC<ReportProps> = ({ marginTop }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,11 +46,6 @@ const Report: React.FC<ReportProps> = ({marginTop}) => {
   // State for today's total expenses
   const [todayTotalExpense, setTodayTotalExpense] = useState(0);
 
-  // State to control visibility of income transactions
-  const [showIncome, setShowIncome] = useState(() => {
-    const stored = localStorage.getItem('show_income');
-    return stored === null ? true : stored === 'true';
-  });
 
   useEffect(() => {
     db.categories.toArray().then(setCategories);
@@ -60,6 +55,16 @@ const Report: React.FC<ReportProps> = ({marginTop}) => {
 
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
+
+
+
+
+
+  // Read showIncome from localStorage on every render
+  const showIncome = localStorage.getItem('show_income') === null
+    ? true
+    : localStorage.getItem('show_income') === 'true';
+
 
   const loadExpenses = async () => {
     setLoading(true);
@@ -234,6 +239,7 @@ const Report: React.FC<ReportProps> = ({marginTop}) => {
         ) : (
           <IonList lines="none">
             {expenses.map(expense => {
+              if (!showIncome && expense.type === 'income') return null; // Skip income if showIncome is false
               const cat = getCategory(expense.category);
               return (
                 <IonItem

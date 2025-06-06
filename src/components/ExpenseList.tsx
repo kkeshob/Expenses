@@ -40,7 +40,7 @@ interface ExpenseListProps {
   marginTop:number;
 }
 
-const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId,marginTop }) => {
+const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,10 +65,14 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId,marginTop }) 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
   const [accounts, setAccounts] = useState<{ id: number; name: string }[]>([]);
-  const [showIncome, setShowIncome] = useState(() => {
-    const stored = localStorage.getItem('show_income');
-    return stored === null ? true : stored === 'true';
-  });
+  
+  // Read showIncome from localStorage on every render
+  const showIncome = localStorage.getItem('show_income') === null
+    ? true
+    : localStorage.getItem('show_income') === 'true';
+
+
+
   let currentGroupId = Number(localStorage.getItem('selectedGroupId'));
 
 
@@ -179,10 +183,12 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId,marginTop }) 
     // eslint-disable-next-line
   }, []);
 
+  // Filtered expenses: hide income transactions if showIncome is false
   const filteredExpenses = showIncome
     ? expenses
     : expenses.filter(exp => exp.type !== 'income');
 
+  // Only sum expenses (not income)
   const totalFilteredExpenses = filteredExpenses
     .filter(exp => exp.type === 'expense')
     .reduce((sum, exp) => sum + exp.amount, 0);
@@ -592,9 +598,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId,marginTop }) 
   }, []);
 
   return (
-    <IonPage style={{ paddingTop: marginTop}}>
-
-
+    <IonPage style={{ paddingTop: marginTop }}>
       <IonContent className="ion-padding" style={{ background: "#f6f8fa" }}>
         <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
           <IonRefresherContent />
@@ -711,6 +715,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId,marginTop }) 
                 ₹{totalFilteredExpenses.toFixed(2)}
               </div>
             </p>
+            
           </IonItem>
           <div style={{ borderBottom: '3px solid gray' }}></div>
                   <div style={{ borderBottom: '15px solid white' }}></div>
@@ -727,6 +732,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId,marginTop }) 
         ) : (
           <IonList lines="none">
             {filteredExpenses.map(expense => {
+                if(!showIncome && expense.type === 'income') return null; // Skip income if showIncome is false
               const cat = getCategory(expense.category);
               function confirmDeleteExpense(expense: Expense): void {
                 setDeletingExpense(expense);

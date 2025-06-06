@@ -36,7 +36,7 @@ interface AllExpensesProps {
   marginTop:number;
 }
 
-const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId,marginTop }) => {
+const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<{ id: number; name: string }[]>([]);
@@ -77,11 +77,16 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId,marginTop }) 
   const [singleDate, setSingleDate] = useState<string>('');
   const [singleDateFilterOpen, setSingleDateFilterOpen] = useState(false);
 
-  // New state for showing/hiding income transactions
-  const [showIncome, setShowIncome] = useState(() => {
-    const stored = localStorage.getItem('show_income');
-    return stored === null ? true : stored === 'true';
-  });
+
+
+
+  // Read showIncome from localStorage on every render
+  const showIncome = localStorage.getItem('show_income') === null
+    ? true
+    : localStorage.getItem('show_income') === 'true';
+
+
+
 
   // Handler for delete confirmation modal
   const handleDeleteExpense = async () => {
@@ -249,13 +254,22 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId,marginTop }) 
     // eslint-disable-next-line
   }, []);
 
+  // Filtered expenses: hide income transactions if showIncome is false
   const filteredExpenses = showIncome
     ? expenses
     : expenses.filter(exp => exp.type !== 'income');
 
+  // Only sum expenses (not income)
   const totalFilteredExpenses = filteredExpenses
     .filter(exp => exp.type === 'expense')
     .reduce((sum, exp) => sum + exp.amount, 0);
+
+  // Calculate net balance (income - expenses), but hide if showIncome is false
+  const totalIncome = filteredExpenses
+    .filter(exp => exp.type === 'income')
+    .reduce((sum, exp) => sum + exp.amount, 0);
+
+  const netBalance = showIncome ? (totalIncome - totalFilteredExpenses) : null;
 
   return (
     <IonPage style={{ paddingTop: marginTop }}>
@@ -390,11 +404,15 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId,marginTop }) 
 
 
 
-          <div className='filterAreaText'>
-            <p style={{ fontSize: 16, color: "#e53935", fontWeight: 800, margin: 'auto',textAlign: 'center' }}>
-           Sum of Filtered Transections = ₹ {totalFilteredExpenses.toFixed(2)}
-          </p>
-          
+          <div className='filterAreaText' style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 16, color: "#e53935", fontWeight: 800, textAlign: 'center' }}>
+              Sum of Filtered Transections = ₹ {totalFilteredExpenses.toFixed(2)}
+            </span>
+            {showIncome && (
+              <span style={{ fontSize: 15, color: "#1976d2", fontWeight: 700, textAlign: 'center' }}>
+                Net Balance: ₹{netBalance?.toFixed(2)}
+              </span>
+            )}
           </div>
 
         </div>
@@ -417,6 +435,7 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId,marginTop }) 
             <br/>
             <IonList lines="none">
               {filteredExpenses.map(expense => {
+                if(!showIncome && expense.type === 'income') return null; // Skip income if showIncome is false
                 const cat = getCategory(expense.category);
                 function confirmDeleteExpense(expense: Expense): void {
                   setDeletingExpense(expense);

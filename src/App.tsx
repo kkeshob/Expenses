@@ -1,27 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   IonApp,
-  IonRouterOutlet,
-  IonTabs,
-  IonTabBar,
-  IonTabButton,
-  IonIcon,
-  IonFab,
-  IonFabButton,
-  IonModal,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonContent,
-  IonButton,
-  IonInput,
-  IonMenu,
-  IonPage,
-  IonButtons,
-  IonMenuButton,
-  IonSplitPane,
-  IonNavLink,
-  IonFooter,
+  IonRouterOutlet, IonTabs, IonTabBar, IonTabButton, IonIcon, IonFab, IonFabButton, IonModal,
+  IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonInput, IonMenu, IonPage, IonButtons,
+  IonMenuButton, IonFooter,
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { Route, Redirect, useHistory } from 'react-router';
@@ -47,19 +29,15 @@ import { db, initializeDB } from './db';
 import Categories from './components/Categories';
 import Report from './components/Reports';
 import { StatusBar, Style } from '@capacitor/status-bar';
-import Expenses from './components/AllExpenses';
 import Sidebar from './components/Sidebar';
 import ExpenseList from './components/ExpenseList';
 import AllExpenses from './components/AllExpenses';
 import Modal from 'react-modal';
 import { SafeArea } from 'capacitor-plugin-safe-area';
-
-import Input from 'react-select/dist/declarations/src/components/Input';
 import { JSX } from 'react/jsx-runtime';
 
 // Call the element loader after the platform has been bootstrapped
 defineCustomElements(window);
-
 const App: React.FC = () => {
   const [showNameModal, setShowNameModal] = useState(false);
   const [userName, setUserName] = useState<string>('');
@@ -153,262 +131,207 @@ const App: React.FC = () => {
       setPasswordError('Incorrect master password');
     }
   };
-
-  // Helper to get header title based on active tab
-  const getHeaderTitle = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return 'Dashboard';
-      case 'expenses':
-        return 'Transections';
-      case 'report':
-        return 'Todays Transection';
-      case 'categories':
-        return 'Manage';
-      case 'transactions':
-        return 'All Transections';
-      default:
-        return activeTab;
-    }
-  };
-
   async function loadGroups(event: React.MouseEvent<HTMLIonButtonsElement, MouseEvent>): Promise<void> {
     const allGroups = await db.accounts.toArray();
     setExpGroups(allGroups);
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    let i=1;
-  const openCategory=()=> {
-
-history.push("/categories");
-
-
-  setActiveTab('Manage');
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  const openCategory = () => {
+    history.push("/categories");
+    setActiveTab('Manage');
+  }
   return (
     <IonApp >
 
-        {/* Sidebar */}
-        <IonMenu className="sidebar" contentId="main-content" type="overlay" side="start" swipeGesture={true}>
-
-
-          <IonHeader
+      {/* Sidebar */}
+      <IonMenu className="sidebar" contentId="main-content" type="overlay" side="start" swipeGesture={true}>
+        <IonHeader
+          style={{
+            paddingTop: 'env(safe-area-inset-top, 0px)', // Handles notch if present, 0px otherwise
+            marginTop: 0 // Remove any marginTop
+          }}>
+          <IonToolbar
+            color="primary"
             style={{
-              paddingTop: 'env(safe-area-inset-top, 0px)', // Handles notch if present, 0px otherwise
-              marginTop: 0 // Remove any marginTop
-            }}>
-            <IonToolbar
-              color="primary"
-              style={{
-                background: 'transparent',
-                marginTop: statusBarHeight // Remove this if present
-              }}
-            >
-              <IonButtons slot="start" onClick={loadGroups}>
-                <IonMenuButton />
-              </IonButtons>
-              <IonTitle>
-                Transection Groups
-              </IonTitle>
-            </IonToolbar>
-          </IonHeader>
-          <IonContent>
-            <div
-              style={{
-                position: "fixed",
-                bottom: 300,
-                right: 0,
-                left: 0,
-                zIndex: 3000,
-                textAlign: "center",
-                pointerEvents: "none",
-                userSelect: "none",
-                opacity: 0.03,
-                fontSize: "4.5vw",
-                fontWeight: 900,
-                letterSpacing: 1,
-                color: "#1976d2",
-                fontFamily: "monospace",
-                textTransform: "lowercase",
-                width: "100%",
-                transform: "rotate(-60deg)", // <-- Make watermark diagonal
-                transformOrigin: "center",
-              }}
-            >
-              kktechssol.
-            </div>
-            <Sidebar
-              selectedGroupId={selectedGroupId}
-              onSelectGroup={setSelectedGroupId}
-              marginTop={statusBarHeight}
-            />
-
-            <IonFooter
-    style={{
-      background: "#0054e9",
-      height:72,
-      bottom:0,
-      position:'fixed',
-      borderTop: "1px solid #e3eafc",
-      boxShadow: "0 -2px 8px rgba(25,118,210,0.06)",
-      padding: "12px 0",
-      textAlign: "center"
-    }}
-  >
-    <div style={{
-      color: "#fff",
-      fontWeight: 800,
-      fontSize: 16,
-      lineHeight:3,
-      letterSpacing: 1,
-      fontFamily: "monospace"
-    }}>
-      &copy; {new Date().getFullYear()} kktechsol.
-    </div>
-  </IonFooter>
-           </IonContent>
-        </IonMenu>
-
-
-
-        {/* Main Content */}
-        <IonPage id="main-content">
-          <IonHeader
+              background: 'transparent',
+              marginTop: statusBarHeight // Remove this if present
+            }}
+          >
+            <IonButtons slot="start" onClick={loadGroups}>
+              <IonMenuButton />
+            </IonButtons>
+            <IonTitle>
+              Transection Groups
+            </IonTitle>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent>
+          <div
             style={{
-              paddingTop: 'env(safe-area-inset-top, 0px)', // Handles notch if present, 0px otherwise
-              marginTop: 0 // Remove any marginTop
+              position: "fixed",
+              bottom: 300,
+              right: 0,
+              left: 0,
+              zIndex: 3000,
+              textAlign: "center",
+              pointerEvents: "none",
+              userSelect: "none",
+              opacity: 0.03,
+              fontSize: "4.5vw",
+              fontWeight: 900,
+              letterSpacing: 1,
+              color: "#1976d2",
+              fontFamily: "monospace",
+              textTransform: "lowercase",
+              width: "100%",
+              transform: "rotate(-60deg)", // <-- Make watermark diagonal
+              transformOrigin: "center",
+            }}
+          >
+            kktechssol.
+          </div>
+          <Sidebar
+            selectedGroupId={selectedGroupId}
+            onSelectGroup={setSelectedGroupId}
+            marginTop={statusBarHeight}
+          />
+
+          <IonFooter
+            style={{
+              background: "#0054e9",
+              height: 72,
+              bottom: 0,
+              position: 'fixed',
+              borderTop: "1px solid #e3eafc",
+              boxShadow: "0 -2px 8px rgba(25,118,210,0.06)",
+              padding: "12px 0",
+              textAlign: "center"
+            }}
+          >
+            <div style={{
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: 16,
+              lineHeight: 3,
+              letterSpacing: 1,
+              fontFamily: "monospace"
             }}>
-            <IonToolbar
-              color="primary"
-              style={{
-                background: 'transparent',
-                marginTop: statusBarHeight // Remove this if present
-              }}
-            >
-              <IonButtons slot="start" onClick={loadGroups}>
-                <IonMenuButton />
-              </IonButtons>
-              <IonTitle>
-                {activeTab}
-              </IonTitle>
-              <IonButtons slot="end">
-                <IonButton
-                  onClick={()=>openCategory()}>
-                  <IonIcon icon={settingsOutline} />
-                </IonButton>
-              </IonButtons>
-            </IonToolbar>
-          </IonHeader>
-          
-            <IonTabs>
-              <IonRouterOutlet>
-                <Route exact path="/dashboard">
-                  <Dashboard marginTop={statusBarHeight+40} />
-                </Route>
-                <Route exact path="/expenses">
-                  <ExpenseList selectedGroupId={selectedGroupId} marginTop={statusBarHeight+40} />
-                </Route>
-                <Route exact path="/report">
-                  <Report marginTop={statusBarHeight+40} />
-                </Route>
-                <Route exact path="/transactions">
-                  <AllExpenses selectedGroupId={selectedGroupId} marginTop={statusBarHeight+40} />
-                </Route>
-                <Route exact path="/categories">
-                  <Categories marginTop={statusBarHeight+40} />
-                </Route>
-                <Redirect exact from="/" to="/dashboard" />
-              </IonRouterOutlet>
-
-            <div
-              style={{
-                position: "fixed",
-                bottom: 300,
-                right: 0,
-                left: 0,
-                zIndex: 3000,
-                textAlign: "center",
-                pointerEvents: "none",
-                userSelect: "none",
-                opacity: 0.03,
-                fontSize: "5vw",
-                fontWeight: 900,
-                letterSpacing: 1,
-                color: "#1976d2",
-                fontFamily: "monospace",
-                textTransform: "lowercase",
-                width: "100%",
-                transform: "rotate(-60deg)", // <-- Make watermark diagonal
-                transformOrigin: "center",
-              }}
-            >
-              kktechsol.
+              &copy; {new Date().getFullYear()} kktechsol.
             </div>
-
-
-              <IonTabBar ref={tabBarRef}
-                slot="bottom"
-                color={'primary'}
-                onIonTabsDidChange={e => setActiveTab(e.detail.tab)}
-                className='bottomTabBar'
-
-              >
-                <IonTabButton tab="Dashboard" href="/dashboard" >
-                  <IonIcon icon={homeOutline} />
-                </IonTabButton>
-                <IonTabButton tab="Report" href="/report">
-                  <IonIcon icon={statsChart} />
-                </IonTabButton>
-                
-                <IonTabButton tab="Add Transection" href='/report'>
-                  <IonFab vertical='bottom'>
-                    <IonFabButton color={'light'} onClick={() => setShowExpenseModal(true)}>
-                      <IonIcon icon={add}></IonIcon>
-                    </IonFabButton>
-                  </IonFab>
-                </IonTabButton>
-                <IonTabButton tab="Expenses" href="/expenses" >
-                  <IonIcon icon={list} />
-                </IonTabButton>
-                <IonTabButton tab="All Transecctions" href="/transactions">
-                  <IonIcon icon={clipboard} />
-                </IonTabButton>
+          </IonFooter>
+        </IonContent>
+      </IonMenu>
 
 
 
-              </IonTabBar>
-            </IonTabs>
-  
-        </IonPage>
+      {/* Main Content */}
+      <IonPage id="main-content">
+        <IonHeader
+          style={{
+            paddingTop: 'env(safe-area-inset-top, 0px)', // Handles notch if present, 0px otherwise
+            marginTop: 0 // Remove any marginTop
+          }}>
+          <IonToolbar
+            color="primary"
+            style={{
+              background: 'transparent',
+              marginTop: statusBarHeight // Remove this if present
+            }}
+          >
+            <IonButtons slot="start" onClick={loadGroups}>
+              <IonMenuButton />
+            </IonButtons>
+            <IonTitle>
+              {activeTab}
+            </IonTitle>
+            <IonButtons slot="end">
+              <IonButton
+                onClick={() => openCategory()}>
+                <IonIcon icon={settingsOutline} />
+              </IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+
+        <IonTabs>
+          <IonRouterOutlet>
+            <Route exact path="/dashboard">
+              <Dashboard marginTop={statusBarHeight + 40} />
+            </Route>
+            <Route exact path="/expenses">
+              <ExpenseList selectedGroupId={selectedGroupId} marginTop={statusBarHeight + 40} />
+            </Route>
+            <Route exact path="/report">
+              <Report marginTop={statusBarHeight + 40} />
+            </Route>
+            <Route exact path="/transactions">
+              <AllExpenses selectedGroupId={selectedGroupId} marginTop={statusBarHeight + 40} />
+            </Route>
+            <Route exact path="/categories">
+              <Categories marginTop={statusBarHeight + 40} />
+            </Route>
+            <Redirect exact from="/" to="/dashboard" />
+          </IonRouterOutlet>
+
+          <div
+            style={{
+              position: "fixed",
+              bottom: 300,
+              right: 0,
+              left: 0,
+              zIndex: 3000,
+              textAlign: "center",
+              pointerEvents: "none",
+              userSelect: "none",
+              opacity: 0.03,
+              fontSize: "5vw",
+              fontWeight: 900,
+              letterSpacing: 1,
+              color: "#1976d2",
+              fontFamily: "monospace",
+              textTransform: "lowercase",
+              width: "100%",
+              transform: "rotate(-60deg)", // <-- Make watermark diagonal
+              transformOrigin: "center",
+            }}
+          >
+            kktechsol.
+          </div>
+
+
+          <IonTabBar ref={tabBarRef}
+            slot="bottom"
+            color={'primary'}
+            onIonTabsDidChange={e => setActiveTab(e.detail.tab)}
+            className='bottomTabBar'
+
+          >
+            <IonTabButton tab="Dashboard" href="/dashboard" >
+              <IonIcon icon={homeOutline} />
+            </IonTabButton>
+            <IonTabButton tab="Report" href="/report">
+              <IonIcon icon={statsChart} />
+            </IonTabButton>
+
+            <IonTabButton tab="Add Transection" href='/report'>
+              <IonFab vertical='bottom'>
+                <IonFabButton color={'light'} onClick={() => setShowExpenseModal(true)}>
+                  <IonIcon icon={add}></IonIcon>
+                </IonFabButton>
+              </IonFab>
+            </IonTabButton>
+            <IonTabButton tab="Expenses" href="/expenses" >
+              <IonIcon icon={list} />
+            </IonTabButton>
+            <IonTabButton tab="All Transecctions" href="/transactions">
+              <IonIcon icon={clipboard} />
+            </IonTabButton>
+
+
+
+          </IonTabBar>
+        </IonTabs>
+
+      </IonPage>
 
 
       {/* Toast Notifications */}
