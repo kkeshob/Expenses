@@ -1,0 +1,46 @@
+
+
+
+ion-content {
+  --padding-top: var(--ion-safe-area-top, 0);
+}
+
+/* Custom styles for the expense manager */
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ion-color-light);
+}
+
+.summary-item:last-child {
+  border-bottom: none;
+  font-weight: bold;
+}
+
+.chart-container {
+  height: 300px;
+  width: 100%;
+  margin: 16px 0;
+}
+
+ion-card {
+  margin: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+ion-card-header {
+  padding-bottom: 0;
+}
+
+ion-card-title {
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+ion-fab-button {
+  --ion-color-base: var(--ion-color-primary) !important;
+}
+
