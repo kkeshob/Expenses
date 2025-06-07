@@ -861,6 +861,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
                 </IonItem>
               );
             })}
+                        <div className='extraSpace'></div>
           </IonList>
         )}
         {/* Edit Expense Modal (React Modal) */}

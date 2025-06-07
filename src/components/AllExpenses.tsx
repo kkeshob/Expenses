@@ -24,7 +24,7 @@ import {
   IonDatetime,
   IonText
 } from '@ionic/react';
-import { trash, pencil, calendarOutline, funnelOutline, reloadCircleOutline } from 'ionicons/icons';
+import { trash, pencil, calendarOutline, funnelOutline, reloadCircleOutline, closeCircleSharp } from 'ionicons/icons';
 import { db, Expense, Category } from '../db';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { toast, ToastContainer } from 'react-toastify';
@@ -407,9 +407,8 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
           <div className='filterAreaText' style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, marginBottom: 8 }}>
    
            
-            <IonButton
-              size='small'
-              color="danger"
+            <button
+              
               onClick={() => {
                 setSearchText('');
                 setSelectedCategory('');
@@ -420,10 +419,10 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
                 setResultText('');
                 loadExpenses();
               }}
-              style={{  height: 50, width: 50, borderRadius: '50%', flex: 1 }}
+              style={{ background:'#fff', height: 5, width:30, borderRadius: '50%', flex: 1 }}
             >
-              <IonIcon icon={reloadCircleOutline} style={{ color: "#fff", fontSize: 50 }} />
-            </IonButton>
+              <IonIcon icon={closeCircleSharp} style={{ color: "#ff0000", fontSize: 30 }} />
+            </button>
 
                      <span style={{  marginTop:-40,marginLeft:30,fontSize: 16, color: "#e53935", fontWeight: 800, textAlign: 'center', flex: 1 }}>
               Sum of Filtered Transections = ₹ {totalFilteredExpenses.toFixed(2)}
@@ -589,6 +588,8 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
                 );
               })}
             </IonList>
+
+            <div className='extraSpace'></div>
           </>
         )}
         {/* Edit Expense Modal (React Modal) */}

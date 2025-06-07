@@ -364,6 +364,7 @@ const Report: React.FC<ReportProps> = ({ marginTop }) => {
                 </IonItem>
               );
             })}
+                        <div className='extraSpace'></div>
           </IonList>
         )}
 
