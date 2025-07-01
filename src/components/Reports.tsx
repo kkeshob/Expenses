@@ -56,27 +56,30 @@ const Report: React.FC<ReportProps> = ({ marginTop }) => {
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
-
-
-
-
   // Read showIncome from localStorage on every render
   const showIncome = localStorage.getItem('show_income') === null
     ? true
     : localStorage.getItem('show_income') === 'true';
 
 
+  const getTodayISORange = () => {
+    const now = new Date();
+    const yyyy = now.getUTCFullYear();
+    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(now.getUTCDate()).padStart(2, '0');
+    const startISO = `${yyyy}-${mm}-${dd}T00:00:00.000Z`;
+    const endISO = `${yyyy}-${mm}-${dd}T23:59:59.999Z`;
+    return { startISO, endISO };
+  };
+
   const loadExpenses = async () => {
     setLoading(true);
     try {
+      const { startISO, endISO } = getTodayISORange();
+
       let allExpenses = await db.expenses
         .where('date')
-        .between(
-          new Date(todayStr + 'T00:00:00.000Z'),
-          new Date(todayStr + 'T23:59:59.999Z'),
-          true,
-          true
-        )
+        .between(startISO, endISO, true, true)
         .reverse()
         .toArray();
 

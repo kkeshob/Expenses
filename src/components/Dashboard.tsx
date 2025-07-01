@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {  IonCard,  IonCardHeader,  IonCardTitle,  IonCardContent,  IonGrid,  IonRow,  IonCol,  IonContent,  IonPage,  IonRefresher,
-  IonRefresherContent,  useIonToast,  IonLabel} from '@ionic/react';
+import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonGrid, IonRow, IonCol, IonContent, IonPage, IonRefresher, IonRefresherContent, useIonToast, IonLabel } from '@ionic/react';
 import { Pie, Bar } from 'react-chartjs-2';
 import { db, Expense } from '../db';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
@@ -14,23 +13,21 @@ function debounce<T extends (...args: any[]) => void>(fn: T, delay: number) {
   };
 }
 interface DashboardProps {
-  marginTop:number;
+  marginTop: number;
 }
-const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
+const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [income, setIncome] = useState<number>(0);
   const [expenseTotal, setExpenseTotal] = useState<number>(0);
-  const [balance, setBalance] = useState<number>(0);
+  const [prevClosingBalance, setPrevClosingBalance] = useState<number>(0); // NEW
+  const [currentBalance, setCurrentBalance] = useState<number>(0); // NEW
   const [loading, setLoading] = useState(true);
   const [present] = useIonToast();
 
-  
-  // Read showIncome from localStorage on every render
   const showIncome = localStorage.getItem('show_income') === null
     ? true
     : localStorage.getItem('show_income') === 'true';
 
-  // Helper to get start and end of a month
   function getMonthRange(offset = 0) {
     const now = new Date();
     const month = now.getMonth() + offset;
@@ -45,26 +42,26 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // Previous month
-      const { start: prevStart, end: prevEnd } = getMonthRange(-1);
-      const prevExpenses = await db.expenses
+      // Calculate carry forward as the sum of all previous months' net balances
+      const { start } = getMonthRange(0); // Start of current month
+      const allPrevExpenses = await db.expenses
         .where('date')
-        .between(prevStart.toISOString(), prevEnd.toISOString(), true, true)
+        .below(start.toISOString())
         .toArray();
 
-      let prevIncomeTotal = 0, prevExpenseSum = 0;
-      for (const e of prevExpenses) {
-        if (e.type === 'income') prevIncomeTotal += e.amount;
-        else if (e.type === 'expense') prevExpenseSum += e.amount;
+      let carryForward = 0;
+      for (const e of allPrevExpenses) {
+        if (e.type === 'income') carryForward += e.amount;
+        else if (e.type === 'expense') carryForward -= e.amount;
       }
-      const prevNetBalance = prevIncomeTotal - prevExpenseSum;
+      setPrevClosingBalance(carryForward);
 
       // Current month
-      const { start, end } = getMonthRange(0);
-      const allExpenses = await db.expenses.toArray();
-      const monthExpenses = allExpenses.filter(e =>
-        new Date(e.date) >= start && new Date(e.date) <= end
-      );
+      const { start: currStart, end: currEnd } = getMonthRange(0);
+      const monthExpenses = await db.expenses
+        .where('date')
+        .between(currStart.toISOString(), currEnd.toISOString(), true, true)
+        .toArray();
       setExpenses(monthExpenses);
 
       let incomeTotal = 0, expenseSum = 0;
@@ -74,7 +71,7 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
       }
       setIncome(incomeTotal);
       setExpenseTotal(expenseSum);
-      setBalance(prevNetBalance + incomeTotal - expenseSum); // Carry forward previous net balance
+      setCurrentBalance(carryForward + incomeTotal - expenseSum);
 
     } catch (error) {
       present({
@@ -88,7 +85,6 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
     }
   }, [present]);
 
-  // Initial load and DB change listener (debounced)
   useEffect(() => {
     loadData();
     const debouncedLoad = debounce(loadData, 200);
@@ -102,16 +98,25 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
     });
   };
 
-  // Prepare data for charts (current month only)
   // Only include income if showIncome is true
   const filteredExpenses = showIncome
     ? expenses
     : expenses.filter(e => e.type !== 'income');
 
+  // Expense by category
   const expenseByCategory = filteredExpenses
     .filter(e => e.type === 'expense')
     .reduce((acc, e) => {
       acc[e.category] = (acc[e.category] || 0) + e.amount;
+      return acc;
+    }, {} as Record<string, number>);
+
+  // Expense by group (if group property exists)
+  const expenseByGroup = filteredExpenses
+    .filter(e => e.type === 'expense')
+    .reduce((acc, e) => {
+      const group = (e as any).group || 'Other';
+      acc[group] = (acc[group] || 0) + e.amount;
       return acc;
     }, {} as Record<string, number>);
 
@@ -132,19 +137,21 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
   };
 
   const barData = {
-    labels: ['Income', 'Expenses', 'Balance'],
+    labels: ['Income', 'Expenses', 'Prev. Closing', 'Current Balance'],
     datasets: [
       {
         label: 'Amount',
-        data: showIncome ? [income, expenseTotal, balance] : [0, expenseTotal, 0],
+        data: showIncome ? [income, expenseTotal, prevClosingBalance, currentBalance] : [0, expenseTotal, prevClosingBalance, currentBalance],
         backgroundColor: [
           'rgba(75, 192, 192, 0.7)',
           'rgba(255, 99, 132, 0.7)',
+          'rgba(255, 206, 86, 0.7)',
           'rgba(54, 162, 235, 0.7)'
         ],
         borderColor: [
           'rgba(75, 192, 192, 1)',
           'rgba(255, 99, 132, 1)',
+          'rgba(255, 206, 86, 1)',
           'rgba(54, 162, 235, 1)'
         ],
         borderWidth: 2,
@@ -156,18 +163,17 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
   };
 
   return (
-    <IonPage style={{ paddingTop: marginTop }} >
-      <IonContent style={{ background: "#f6f8fa"}} >
+    <IonPage style={{ paddingTop: marginTop }}>
+      <IonContent style={{ background: "#f6f8fa" }}>
         <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
           <IonRefresherContent />
         </IonRefresher>
-
         {loading ? (
           <div className="ion-text-center ion-padding">
             <IonLabel>Loading...</IonLabel>
           </div>
         ) : (
-          <IonGrid style={{ overflow: "hidden", margin: '0 auto',height:'80vh' }}>
+          <IonGrid style={{ margin: '0 auto' /* removed overflow/height for scrolling */ }}>
             <IonRow>
               <IonCol size="12" sizeMd="6">
                 <IonCard style={{
@@ -183,9 +189,7 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
                       data={barData}
                       options={{
                         responsive: true,
-                        plugins: {
-                          legend: { display: false }
-                        },
+                        plugins: { legend: { display: false } },
                         scales: {
                           y: {
                             beginAtZero: true,
@@ -206,14 +210,16 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
                       <p style={{ margin: 0, marginBottom: 4 }}>
                         <strong style={{ color: "#e53935" }}>Total Expenses:</strong> ₹{expenseTotal.toFixed(2)}
                       </p>
+                      <p style={{ margin: 0, marginBottom: 4 }}>
+                        <strong style={{ color: "#ffb300" }}>Opening Balance:</strong> {showIncome ? `₹${prevClosingBalance.toFixed(2)}` : '******'}
+                      </p>
                       <p style={{ margin: 0 }}>
-                        <strong style={{ color: "#1976d2" }}>Balance (Carry Forward):</strong> {showIncome ? `₹${balance.toFixed(2)}` : '******'}
+                        <strong style={{ color: "#1976d2" }}>Current Balance:</strong> {showIncome ? `₹${currentBalance.toFixed(2)}` : '******'}
                       </p>
                     </div>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
-
               <IonCol size="12" sizeMd="6">
                 <IonCard style={{
                   borderRadius: 18,
@@ -246,10 +252,21 @@ const Dashboard: React.FC<DashboardProps> = ({marginTop}) => {
                         <p>No expense data available</p>
                       </div>
                     )}
+                    <div style={{ marginTop: 16 }}>
+                      <h4 style={{ marginBottom: 8 }}>Category-wise Expenses (Current Month)</h4>
+                      <ul style={{ paddingLeft: 16 }}>
+                        {Object.entries(expenseByCategory).map(([cat, amt]) => (
+                          <li key={cat} style={{ marginBottom: 4 }}>
+                            <span style={{ fontWeight: 500 }}>{cat}:</span> ₹{amt.toFixed(2)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
             </IonRow>
+<div className='extraSpace'></div>
           </IonGrid>
         )}
         <style>

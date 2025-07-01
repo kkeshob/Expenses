@@ -4,90 +4,62 @@ import {
   IonItem,
   IonLabel,
   IonNote,
-  IonBadge,
   IonIcon,
   IonButtons,
   IonButton,
   IonContent,
-  IonHeader,
   IonPage,
-  IonTitle,
-  IonToolbar,
   IonRefresher,
   IonRefresherContent,
   IonSearchbar,
   IonSelect,
   IonSelectOption,
   IonAvatar,
-  IonModal,
-  IonInput,
-  IonDatetime,
-  IonText
 } from '@ionic/react';
 import { trash, pencil } from 'ionicons/icons';
 import { db, Expense, Category } from '../db';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
-import { Capacitor } from '@capacitor/core'; // <-- add this
+import { Capacitor } from '@capacitor/core';
 import Chart from 'chart.js/auto';
-import { toast, ToastContainer } from 'react-toastify';
+import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from 'react-modal';
 
 interface ExpenseListProps {
   selectedGroupId: number | null;
-  marginTop:number;
+  marginTop: number;
 }
 
 const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [accounts, setAccounts] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  // REMOVE: const [present] = useIonToast();
-
-  // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editAmount, setEditAmount] = useState<number>(0);
   const [editDescription, setEditDescription] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const [editDate, setEditDate] = useState<string>(new Date().toISOString());
-  const [showDateModal, setShowDateModal] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
   const [reportMonth, setReportMonth] = useState<string>(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
-  // Delete confirmation modal state
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
-  const [accounts, setAccounts] = useState<{ id: number; name: string }[]>([]);
-  
-  // Read showIncome from localStorage on every render
   const showIncome = localStorage.getItem('show_income') === null
     ? true
     : localStorage.getItem('show_income') === 'true';
 
-
-
-  let currentGroupId = Number(localStorage.getItem('selectedGroupId'));
-
-
-  // Handler for delete confirmation modal
-  const handleDeleteExpense = async () => {
-    if (deletingExpense && deletingExpense.id !== undefined) {
-      await deleteExpense(deletingExpense.id);
-      setDeleteModalOpen(false);
-      setDeletingExpense(null);
-      await loadExpenses(); // <-- reload after delete
-    }
-  };
-
   useEffect(() => {
     db.categories.toArray().then(setCategories);
+    db.accounts.toArray().then(accs => setAccounts(accs.map(a => ({ id: a.id!, name: a.name }))));
   }, []);
 
   const getCategory = (name: string) => categories.find(cat => cat.name === name);
@@ -95,7 +67,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
   const loadExpenses = async () => {
     setLoading(true);
     try {
-      let allExpenses = [];
+      let allExpenses: Expense[] = [];
       if (selectedGroupId !== null) {
         allExpenses = await db.expenses.where('groupId').equals(selectedGroupId).toArray();
       } else {
@@ -109,32 +81,11 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
     }
   };
 
-  const deleteExpense = async (id: number) => {
-    try {
-      await db.expenses.delete(id);
-      setExpenses(expenses.filter(exp => exp.id !== id));
-      toast.success('Transaction deleted successfully');
-    } catch (error) {
-      toast.error(`Error deleting transaction: ${error}`);
-    }
-  };
-
-  const openEditModal = (expense: Expense) => {
-    setEditingExpense(expense);
-    setEditAmount(expense.amount);
-    setEditDescription(expense.description ?? '');
-    setEditCategory(expense.category);
-    setEditDate(typeof expense.date === 'string' ? expense.date : new Date(expense.date).toISOString());
-    setEditModalOpen(true);
-  };
-
-  // Reload expenses when group, category, or search changes
   useEffect(() => {
     loadExpenses();
     // eslint-disable-next-line
-  }, [searchText, selectedCategory, currentGroupId]);
+  }, [searchText, selectedCategory, selectedGroupId]);
 
-  // Reload expenses when Dexie DB changes (add/edit/delete)
   useEffect(() => {
     const handler = () => loadExpenses();
     db.on('changes', handler);
@@ -142,7 +93,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
     // eslint-disable-next-line
   }, []);
 
-  // Reload expenses after editing or deleting
   const handleEditSave = async () => {
     if (!editingExpense) return;
     if (editAmount <= 0) {
@@ -159,9 +109,24 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
       toast.success('Transaction updated successfully');
       setEditModalOpen(false);
       setEditingExpense(null);
-      await loadExpenses(); // <-- reload after edit
+      await loadExpenses();
     } catch (error) {
       toast.error(`Error updating transaction: ${error}`);
+    }
+  };
+
+  const handleDeleteExpense = async () => {
+    if (deletingExpense && deletingExpense.id !== undefined) {
+      try {
+        await db.expenses.delete(deletingExpense.id);
+        setExpenses(expenses.filter(exp => exp.id !== deletingExpense.id));
+        toast.success('Transaction deleted successfully');
+      } catch (error) {
+        toast.error(`Error deleting transaction: ${error}`);
+      }
+      setDeleteModalOpen(false);
+      setDeletingExpense(null);
+      await loadExpenses();
     }
   };
 
@@ -171,83 +136,96 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
     });
   };
 
-  useEffect(() => {
-    loadExpenses();
-    // eslint-disable-next-line
-  }, [searchText, selectedCategory]);
+  // Helper to get start and end of selected month
+  const getMonthRange = (monthStr: string) => {
+    const [year, month] = monthStr.split('-').map(Number);
+    const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
+    const end = new Date(year, month, 0, 23, 59, 59, 999);
+    return { start, end };
+  };
 
-  useEffect(() => {
-    const handler = () => loadExpenses();
-    db.on('changes', handler);
-    return () => db.on('changes').unsubscribe(handler);
-    // eslint-disable-next-line
-  }, []);
+  // Filtered expenses: only selected month and selected group
+  const filteredExpenses = expenses.filter(exp => {
+    const groupMatch = selectedGroupId === null || exp.groupId === selectedGroupId;
+    const { start, end } = getMonthRange(reportMonth);
+    const expDate = new Date(exp.date);
+    const monthMatch = expDate >= start && expDate <= end;
+    const categoryMatch =
+      selectedCategories.length === 0 ||
+      selectedCategories.includes('') ||
+      selectedCategories.includes(exp.category);
+    const searchMatch =
+      !searchText ||
+      (exp.description && exp.description.toLowerCase().includes(searchText.toLowerCase())) ||
+      (exp.category && exp.category.toLowerCase().includes(searchText.toLowerCase()));
+    const incomeMatch = showIncome || exp.type !== 'income';
+    return groupMatch && monthMatch && categoryMatch && searchMatch && incomeMatch;
+  });
 
-  // Filtered expenses: hide income transactions if showIncome is false
-  const filteredExpenses = showIncome
-    ? expenses
-    : expenses.filter(exp => exp.type !== 'income');
-
-  // Only sum expenses (not income)
   const totalFilteredExpenses = filteredExpenses
     .filter(exp => exp.type === 'expense')
     .reduce((sum, exp) => sum + exp.amount, 0);
 
-  // Helper to get group name by id
   const getGroupName = (groupId: number | null | undefined, accounts: { id: number; name: string }[]) => {
     if (!groupId) return '';
     const group = accounts.find(acc => acc.id === groupId);
     return group ? group.name : '';
   };
 
-  // Generate and download monthly PDF report
+  // PDF Report Generation
   const generateMonthlyPDFReport = async () => {
     const [year, month] = reportMonth.split('-').map(Number);
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 1);
+    const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
+    const end = new Date(year, month, 0, 23, 59, 59, 999);
 
     // Previous month range
     const prevMonth = month === 1 ? 12 : month - 1;
     const prevYear = month === 1 ? year - 1 : year;
-    const prevStart = new Date(prevYear, prevMonth - 1, 1);
-    const prevEnd = new Date(prevYear, prevMonth, 1);
+    const prevStart = new Date(prevYear, prevMonth - 1, 1, 0, 0, 0, 0);
+    const prevEnd = new Date(prevYear, prevMonth, 0, 23, 59, 59, 999);
 
-    // Current and previous month expenses
-    const filtered = filteredExpenses.filter(exp => {
-      const date = new Date(exp.date);
-      return date >= start && date < end;
-    });
-    const prevFiltered = filteredExpenses.filter(exp => {
-      const date = new Date(exp.date);
-      return date >= prevStart && date < prevEnd;
-    });
-
-    // Calculate previous month net balance for the selected group
-    let prevMonthExpenses = [];
+    // Get all expenses for the selected group
+    let allExpenses: Expense[] = [];
     if (selectedGroupId !== null) {
-      prevMonthExpenses = await db.expenses
-        .where('groupId').equals(selectedGroupId)
-        .and(exp => {
-          const date = new Date(exp.date);
-          return date >= prevStart && date < prevEnd;
-        })
-        .toArray();
+      allExpenses = await db.expenses.where('groupId').equals(selectedGroupId).toArray();
     } else {
-      prevMonthExpenses = expenses.filter(exp => {
-        const date = new Date(exp.date);
-        return date >= prevStart && date < prevEnd;
-      });
+      allExpenses = await db.expenses.toArray();
     }
 
-    const prevIncome = prevMonthExpenses
-      .filter(exp => exp.type === 'income')
-      .reduce((sum, exp) => sum + exp.amount, 0);
+    // Filter for current and previous month
+    const filtered = allExpenses.filter(exp => {
+      const date = new Date(exp.date);
+      return date >= start && date <= end;
+    });
+    const prevFiltered = allExpenses.filter(exp => {
+      const date = new Date(exp.date);
+      return date >= prevStart && date <= prevEnd;
+    });
 
-    const prevExpense = prevMonthExpenses
-      .filter(exp => exp.type === 'expense')
-      .reduce((sum, exp) => sum + exp.amount, 0);
+    // Calculate previous month net
+    const prevIncome = prevFiltered.filter(exp => exp.type === 'income').reduce((sum, exp) => sum + exp.amount, 0);
+    const prevExpense = prevFiltered.filter(exp => exp.type === 'expense').reduce((sum, exp) => sum + exp.amount, 0);
+   // const openingBalance = prevIncome - prevExpense; // Opening balance for this month
 
-    const prevNetBalance = prevIncome - prevExpense;
+    // Calculate opening balance as sum of all previous transactions
+    const openingBalance = allExpenses
+      .filter(exp => new Date(exp.date) < start)
+      .reduce((sum, exp) => {
+        if (exp.type === 'income') return sum + exp.amount;
+        if (exp.type === 'expense') return sum - exp.amount;
+        return sum;
+      }, 0);
+
+    // Calculate this month net
+    const totalIncome = filtered.filter(exp => exp.type === 'income').reduce((sum, exp) => sum + exp.amount, 0);
+    const totalExpense = filtered.filter(exp => exp.type === 'expense').reduce((sum, exp) => sum + exp.amount, 0);
+    const thisMonthNet = totalIncome - totalExpense;
+
+    // Closing balance for this month
+    const closingBalance = openingBalance + thisMonthNet;
+
+    // Net balance (opening + this month)
+    const netBalance = openingBalance + thisMonthNet;
 
     // Prepare data for charts
     const expenseByCategory: { [cat: string]: number } = {};
@@ -393,20 +371,16 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
     });
 
     const userName = localStorage.getItem('userName') || 'User';
+    const groupName =
+      selectedGroupId !== null
+        ? getGroupName(selectedGroupId, accounts)
+        : 'All Groups';
 
-    // Prepare PDF
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
-
-    
-    // Header with group name
-    const groupName =
-      selectedGroupId !== null
-        ? getGroupName(selectedGroupId, accounts)
-        : 'All Groups';
 
     doc.setFontSize(22);
     doc.setTextColor(33, 150, 243);
@@ -416,7 +390,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
     doc.setTextColor(80, 80, 80);
     doc.text(`${userName}`, 105, 24, { align: 'center' });
 
-    // Add group name to the report
     doc.setFontSize(10);
     doc.setTextColor(80, 80, 80);
     doc.text(
@@ -425,7 +398,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
       30,
       { align: 'center' }
     );
-
 
     doc.setFontSize(12);
     doc.setTextColor(80, 80, 80);
@@ -436,49 +408,38 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
       { align: 'center' }
     );
 
-
-
-        // Previous Month Net Balance
     doc.setFontSize(10);
     doc.setTextColor(33, 150, 243);
     doc.text(
-      `Previous Month Net: ₹${prevNetBalance.toFixed(2)}`,
+      `Opening Balance: ₹${openingBalance.toFixed(2)}`,
       40,
       42,
       { align: 'center' }
     );
 
-    // Draw header line
     doc.setDrawColor(180, 180, 180);
     doc.setLineWidth(0.6);
     doc.line(14, 44, 196, 44);
 
-    // Add 3 charts in one row (inside border)
     const chartWidth = 58;
     const chartHeight = 38;
     const marginLeft = 6;
     const gap = 10;
+    const chartsY = 49;
 
-    // Adjust the Y position so all charts fit inside the border
-    const chartsY = 49; // was 45
-
-    // All charts in one row, all inside the border
     doc.addImage(pieImg, 'PNG', marginLeft, 45, chartWidth, 30);
     doc.addImage(barImg, 'PNG', marginLeft + chartWidth + gap, chartsY, chartWidth, chartHeight);
     doc.addImage(lineImg, 'PNG', marginLeft + 2 * (chartWidth + gap), chartsY, chartWidth, chartHeight);
 
-    // Draw header line
     doc.setDrawColor(180, 180, 180);
     doc.setLineWidth(0.6);
     doc.line(14, 90, 196, 90);
 
-
-    // Move y below the charts for the tables
     let y = chartsY + chartHeight + 10;
 
     // Table: Income
     const incomeRows: any[] = [];
-    let totalIncome = 0;
+    let totalIncomeTable = 0;
     filtered.forEach(exp => {
       if (exp.type === 'income') {
         incomeRows.push([
@@ -487,7 +448,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
           new Date(exp.date).toLocaleDateString(),
           exp.amount.toFixed(2)
         ]);
-        totalIncome += exp.amount;
+        totalIncomeTable += exp.amount;
       }
     });
     if (incomeRows.length > 0) {
@@ -504,13 +465,13 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
       });
       y = (doc as any).lastAutoTable.finalY + 8;
       doc.setFontSize(12);
-      doc.text(`Total Income: ₹${totalIncome.toFixed(2)}`, 14, y);
+      doc.text(`Total Income: ₹${totalIncomeTable.toFixed(2)}`, 14, y);
       y += 10;
     }
 
     // Table: Expenses
     const expenseRows: any[] = [];
-    let totalExpense = 0;
+    let totalExpenseTable = 0;
     filtered.forEach(exp => {
       if (exp.type === 'expense') {
         expenseRows.push([
@@ -519,7 +480,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
           new Date(exp.date).toLocaleDateString(),
           exp.amount.toFixed(2)
         ]);
-        totalExpense += exp.amount;
+        totalExpenseTable += exp.amount;
       }
     });
     if (expenseRows.length > 0) {
@@ -537,21 +498,36 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
       y = (doc as any).lastAutoTable.finalY + 8;
       doc.setFontSize(12);
       doc.setTextColor(255, 0, 0);
-      doc.text(`Total Expenses: ₹${totalExpense.toFixed(2)}`, 14, y);
+      doc.text(`Total Expenses: ₹${totalExpenseTable.toFixed(2)}`, 14, y);
       y += 10;
     }
 
+    // Summarize all expenses by category for the selected month
+    const summaryRows = Object.entries(expenseByCategory)
+      .map(([cat, amount]) => [cat, `₹${amount.toFixed(2)}`]);
 
-    // Calculate remaining net balance (previous month net + this month net)
-    const thisMonthNet = totalIncome - totalExpense;
-    const remainingNetBalance = prevNetBalance + thisMonthNet;
+    if (summaryRows.length > 0) {
+      doc.setFontSize(13);
+      doc.setTextColor(44, 62, 80);
+      doc.text('Expense Summary by Category', 14, y);
+      y += 4;
+      autoTable(doc, {
+        head: [['Category', 'Total']],
+        body: summaryRows,
+        startY: y + 2,
+        theme: 'striped',
+        styles: { fontSize: 10, cellPadding: 2 },
+        headStyles: { fillColor: [66, 165, 245] }
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
 
     // Remaining Net Balance
     if (showIncome) {
       doc.setFontSize(13);
       doc.setTextColor(33, 150, 243);
       doc.text(
-        `Net Balance: ₹${remainingNetBalance.toFixed(2)}`,
+        `Closing Balance: ₹${closingBalance.toFixed(2)}`,
         14,
         y + 10
       );
@@ -572,7 +548,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
         await Filesystem.writeFile({
           path: fileName,
           data: base64Data,
-          directory: Directory.Documents, // or Directory.External for Downloads
+          directory: Directory.Documents,
           encoding: Encoding.BASE64,
         });
         toast.success(`PDF saved to device storage as ${fileName}`);
@@ -593,10 +569,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
     }
   };
 
-  useEffect(() => {
-    db.accounts.toArray().then(accs => setAccounts(accs.map(a => ({ id: a.id!, name: a.name }))));
-  }, []);
-
   return (
     <IonPage style={{ paddingTop: marginTop }}>
       <IonContent className="ion-padding" style={{ background: "#f6f8fa" }}>
@@ -604,16 +576,14 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
           <IonRefresherContent />
         </IonRefresher>
 
-        <div
-          style={{
-            position: 'sticky',
-            top: -60,
-            zIndex: 10,
-            display: 'block',
-            background: '#fff',
-            marginBottom: 16,
-          }}
-        >
+        <div style={{
+          position: 'sticky',
+          top: -60,
+          zIndex: 10,
+          display: 'block',
+          background: '#fff',
+          marginBottom: 16,
+        }}>
           <IonSearchbar
             value={searchText}
             onIonChange={e => setSearchText(e.detail.value!)}
@@ -632,8 +602,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
 
           <center><p className='reportText'>Generate Monthly PDF Report</p></center>
           <div style={{ margin: "0 auto", marginTop: -13, marginBottom: 3, display: "flex", gap: 0, alignItems: "center", justifyContent: "center" }}>
-
-
             <IonItem style={{ background: "#fff", flex: 1 }}>
               <IonSelect
                 value={reportMonth.split('-')[0]}
@@ -678,14 +646,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
               Download
             </IonButton>
           </div>
-
-
-
-
-
-
           <div style={{ borderBottom: '1px solid black' }}></div>
-
           <IonItem
             lines="none"
             className="ion-margin-bottom"
@@ -695,30 +656,40 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
               marginBottom: 0
             }}
           >
+            <div className="wrapHalf">            
             <IonLabel>Category</IonLabel>
             <IonSelect
-              value={selectedCategory}
+              value={selectedCategories}
+              multiple
               placeholder="All"
-              onIonChange={e => setSelectedCategory(e.detail.value)}
+              onIonChange={e => setSelectedCategories(e.detail.value)}
               interface="popover"
             >
               <IonSelectOption value="">All</IonSelectOption>
               {categories.map(cat => (
                 <IonSelectOption key={cat.id} value={cat.name}>
-                  <IonIcon icon={cat.icon} style={{ color: cat.color, marginRight: 8 }} /> {cat.name}
+                  <IonIcon  style={{ color: cat.color, marginRight: 8 }} /> {cat.name}
                 </IonSelectOption>
               ))}
             </IonSelect>
+</div>
+<div className="wrapHalf">
 
             <p>Total Expenses:
               <div style={{ fontSize: 18, color: "#e53935", fontWeight: 600 }}>
                 ₹{totalFilteredExpenses.toFixed(2)}
               </div>
             </p>
-            
+     
+     </div>
           </IonItem>
+
+
+
+
+
           <div style={{ borderBottom: '3px solid gray' }}></div>
-                  <div style={{ borderBottom: '15px solid white' }}></div>
+          <div style={{ borderBottom: '15px solid white' }}></div>
         </div>
 
         {loading ? (
@@ -732,12 +703,12 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
         ) : (
           <IonList lines="none">
             {filteredExpenses.map(expense => {
-                if(!showIncome && expense.type === 'income') return null; // Skip income if showIncome is false
+              if (!showIncome && expense.type === 'income') return null;
               const cat = getCategory(expense.category);
-              function confirmDeleteExpense(expense: Expense): void {
+              const confirmDeleteExpense = (expense: Expense) => {
                 setDeletingExpense(expense);
                 setDeleteModalOpen(true);
-              }
+              };
               return (
                 <IonItem
                   key={expense.id}
@@ -845,7 +816,14 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
                     <IonButtons slot="end" style={{ marginLeft: 8, alignSelf: 'flex-start' }}>
                       <IonButton
                         color="medium"
-                        onClick={() => openEditModal(expense)}
+                        onClick={() => {
+                          setEditingExpense(expense);
+                          setEditAmount(expense.amount);
+                          setEditDescription(expense.description ?? '');
+                          setEditCategory(expense.category);
+                          setEditDate(typeof expense.date === 'string' ? expense.date : new Date(expense.date).toISOString());
+                          setEditModalOpen(true);
+                        }}
                         style={{ marginRight: 2 }}
                       >
                         <IonIcon icon={pencil} />
@@ -861,10 +839,11 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
                 </IonItem>
               );
             })}
-                        <div className='extraSpace'></div>
+            <div className='extraSpace'></div>
           </IonList>
         )}
-        {/* Edit Expense Modal (React Modal) */}
+
+        {/* Edit Expense Modal */}
         <Modal
           isOpen={editModalOpen}
           onRequestClose={() => setEditModalOpen(false)}
@@ -903,7 +882,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
               fontWeight: 700,
               letterSpacing: 1,
               fontSize: 22,
-
               marginBottom: 18,
               color: '#1976d2',
               textAlign: 'center'
@@ -1115,10 +1093,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
             }
           `}
         </style>
-
       </IonContent>
-
-
     </IonPage>
   );
 };

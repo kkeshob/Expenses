@@ -213,6 +213,7 @@ const Categories: React.FC <CategoriesProps>= ({marginTop}) => {
 
   return (
     <IonPage style={{ paddingTop: marginTop }} >
+      
 
       <IonContent style={{ background: "#f6f8fa" }}>
         {/* Fixed backup/restore block */}
@@ -226,7 +227,6 @@ const Categories: React.FC <CategoriesProps>= ({marginTop}) => {
             maxWidth: 500,
             margin: "0 auto",
             padding: 16,
-            borderRadius: 18,
             background: "#fff",
             boxShadow: "0 4px 24px rgba(25,118,210,0.13)",
             display: 'flex',
@@ -234,6 +234,7 @@ const Categories: React.FC <CategoriesProps>= ({marginTop}) => {
             alignItems: 'center'
           }}
         >
+          
           <IonButton expand="block" color="primary" onClick={backupToDevice} style={{ borderRadius: 16, marginBottom: 12, fontWeight: 600, width: '100%' }}>
             <IonIcon icon={cloudUpload} slot="start" />
             Backup Full Database to Device
@@ -267,7 +268,7 @@ const Categories: React.FC <CategoriesProps>= ({marginTop}) => {
         </div>
 
         {/* Add padding-top to avoid overlap with fixed block */}
-        <div style={{ paddingTop: 210 }}>
+        <div style={{ paddingTop: 200 }}>
           {loading ? (
             <div className="ion-text-center ion-padding">
               <IonLabel>Loading categories...</IonLabel>
@@ -282,30 +283,7 @@ const Categories: React.FC <CategoriesProps>= ({marginTop}) => {
             </div>
           ) : (
             <>
-              <div
-                style={{
-                  position: "fixed",
-                  bottom: 300,
-                  right: 0,
-                  left: 0,
-                  zIndex: 3000,
-                  textAlign: "center",
-                  pointerEvents: "none",
-                  userSelect: "none",
-                  opacity: 0.03,
-                  fontSize: "5vw",
-                  fontWeight: 900,
-                  letterSpacing: 2,
-                  color: "#1976d2",
-                  fontFamily: "monospace",
-                  textTransform: "lowercase",
-                  width: "100%",
-                  transform: "rotate(-60deg)", // <-- Make watermark diagonal
-                  transformOrigin: "center",
-                }}
-              >
-                kktechssol.
-              </div>
+             
               <IonList style={{ maxWidth: 500, margin: "0 auto" }}>
                 <IonItemDivider color="light" style={{
                   borderRadius: 10,
@@ -436,6 +414,8 @@ const Categories: React.FC <CategoriesProps>= ({marginTop}) => {
                       </IonButtons>
                     </IonItem>
                   ))}
+
+                                         <div className='extraSpace'></div>
               </IonList>
 
               <IonFab
@@ -445,9 +425,9 @@ const Categories: React.FC <CategoriesProps>= ({marginTop}) => {
                 slot="fixed"
                 style={{
                   position: 'fixed',
-                  bottom: 24,
+                  bottom: 85,
                   right: 24,
-                  zIndex: 1201, // above modals and content
+                  zIndex: 1555, // above modals and content
                 }}
               >
                 <IonFabButton onClick={openAddModal} color="primary">

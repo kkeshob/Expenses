@@ -1,7 +1,10 @@
 .padddingTop {
   padding-top: 50px !important;
 }
-
+.wrapHalf{
+  width:50%;
+  overflow: hidden;
+}
 .sidebar {
   width: 100%;
   height: 100vh;
