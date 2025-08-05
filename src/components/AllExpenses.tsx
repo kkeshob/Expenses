@@ -5,9 +5,6 @@ import {
   IonLabel,
   IonNote,
   IonBadge,
-  IonIcon,
-  IonButtons,
-  IonButton,
   IonContent,
   IonHeader,
   IonPage,
@@ -22,18 +19,19 @@ import {
   IonModal,
   IonInput,
   IonDatetime,
-  IonText
+  IonText,
+  IonButton,
+  IonButtons,
+  IonIcon
 } from '@ionic/react';
-import { trash, pencil, calendarOutline, funnelOutline, reloadCircleOutline, closeCircleSharp } from 'ionicons/icons';
+import { funnelOutline, closeCircleSharp } from 'ionicons/icons';
 import { db, Expense, Category } from '../db';
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from 'react-toastify';
 import Modal from 'react-modal';
 
 interface AllExpensesProps {
   selectedGroupId: number | null;
-  marginTop:number;
+  marginTop: number;
 }
 
 const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop }) => {
@@ -44,9 +42,6 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [resultText, setResultText] = useState('');
-  // REMOVE: const [present] = useIonToast();
-
-  // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editAmount, setEditAmount] = useState<number>(0);
@@ -58,47 +53,19 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-
-  // Delete confirmation modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
-  let currentGroupId = Number(localStorage.getItem('selectedGroupId'));
-
-
-  // Add group filter state
   const [selectedGroup, setSelectedGroup] = useState<number | ''>('');
-
-  // Date filter state
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
-
-  // Add new state for single date filter
   const [singleDate, setSingleDate] = useState<string>('');
   const [singleDateFilterOpen, setSingleDateFilterOpen] = useState(false);
 
-
-
-
-  // Read showIncome from localStorage on every render
   const showIncome = localStorage.getItem('show_income') === null
     ? true
     : localStorage.getItem('show_income') === 'true';
 
-
-
-
-  // Handler for delete confirmation modal
-  const handleDeleteExpense = async () => {
-    if (deletingExpense && deletingExpense.id !== undefined) {
-      await deleteExpense(deletingExpense.id);
-      setDeleteModalOpen(false);
-      setDeletingExpense(null);
-      await loadExpenses(); // <-- reload after delete
-    }
-  };
-
-  // Fetch categories and accounts (groups)
   useEffect(() => {
     db.categories.toArray().then(setCategories);
     db.accounts.toArray().then(accs => setAccounts(accs.map(a => ({ id: a.id!, name: a.name }))));
@@ -106,31 +73,25 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
 
   const getCategory = (name: string) => categories.find(cat => cat.name === name);
 
-  // Helper to get group name by id
   const getGroupName = (groupId: number | null | undefined) => {
     if (!groupId) return '';
     const group = accounts.find(acc => acc.id === groupId);
     return group ? group.name : '';
   };
 
-  // Filter and load expenses by search, category, and group
   const loadExpenses = async () => {
     setLoading(true);
     try {
       let allExpenses = await db.expenses.toArray();
 
-      // Filter by group if selected
       if (selectedGroup !== '') {
         allExpenses = allExpenses.filter(exp => exp.groupId === selectedGroup);
-
       }
 
-      // Filter by category if selected
       if (selectedCategory) {
         allExpenses = allExpenses.filter(exp => exp.category === selectedCategory);
       }
 
-      // Filter by search text
       if (searchText) {
         const search = searchText.toLowerCase();
         allExpenses = allExpenses.filter(
@@ -140,7 +101,6 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
         );
       }
 
-      // Only apply one date filter at a time
       if (singleDate) {
         allExpenses = allExpenses.filter(
           exp => new Date(exp.date).toISOString().slice(0, 10) === singleDate
@@ -148,7 +108,6 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
         setResultText(
           `Showing transactions for Date :  ${new Date(singleDate).toLocaleDateString()}`
         );
-
       } else if (dateFrom || dateTo) {
         if (dateFrom) {
           allExpenses = allExpenses.filter(exp => new Date(exp.date) >= new Date(dateFrom));
@@ -167,7 +126,7 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
           `Showing transactions for ${selectedCategory ? selectedCategory : 'All Categories'} 
           ${selectedGroup ? `in Group: ${getGroupName(selectedGroup)}` : ''} 
           ${searchText ? `matching: "${searchText}"` : ''}`
-        );      
+        );
       } else {
         setResultText('');
       }
@@ -199,13 +158,11 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
     setEditModalOpen(true);
   };
 
-  // Reload expenses when filters change
   useEffect(() => {
     loadExpenses();
     // eslint-disable-next-line
   }, [searchText, selectedCategory, selectedGroup]);
 
-  // Reload expenses when Dexie DB changes (add/edit/delete)
   useEffect(() => {
     const handler = () => loadExpenses();
     db.on('changes', handler);
@@ -213,7 +170,6 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
     // eslint-disable-next-line
   }, []);
 
-  // Reload expenses after editing or deleting
   const handleEditSave = async () => {
     if (!editingExpense) return;
     if (editAmount <= 0) {
@@ -230,9 +186,18 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
       toast.success('Transaction updated successfully');
       setEditModalOpen(false);
       setEditingExpense(null);
-      await loadExpenses(); // <-- reload after edit
+      await loadExpenses();
     } catch (error) {
       toast.error(`Error updating transaction: ${error}`);
+    }
+  };
+
+  const handleDeleteExpense = async () => {
+    if (deletingExpense && deletingExpense.id !== undefined) {
+      await deleteExpense(deletingExpense.id);
+      setDeleteModalOpen(false);
+      setDeletingExpense(null);
+      await loadExpenses();
     }
   };
 
@@ -242,34 +207,32 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
     });
   };
 
-  useEffect(() => {
-    loadExpenses();
-    // eslint-disable-next-line
-  }, [searchText, selectedCategory]);
-
-  useEffect(() => {
-    const handler = () => loadExpenses();
-    db.on('changes', handler);
-    return () => db.on('changes').unsubscribe(handler);
-    // eslint-disable-next-line
-  }, []);
-
-  // Filtered expenses: hide income transactions if showIncome is false
   const filteredExpenses = showIncome
     ? expenses
     : expenses.filter(exp => exp.type !== 'income');
 
-  // Only sum expenses (not income)
   const totalFilteredExpenses = filteredExpenses
     .filter(exp => exp.type === 'expense')
     .reduce((sum, exp) => sum + exp.amount, 0);
 
-  // Calculate net balance (income - expenses), but hide if showIncome is false
   const totalIncome = filteredExpenses
     .filter(exp => exp.type === 'income')
     .reduce((sum, exp) => sum + exp.amount, 0);
 
   const netBalance = showIncome ? (totalIncome - totalFilteredExpenses) : null;
+
+  // Group filteredExpenses by date
+  const expensesByDay: { [date: string]: Expense[] } = {};
+  filteredExpenses.forEach(exp => {
+    const dateStr = new Date(exp.date).toLocaleDateString();
+    if (!expensesByDay[dateStr]) expensesByDay[dateStr] = [];
+    expensesByDay[dateStr].push(exp);
+  });
+
+  const sortedDays = Object.keys(expensesByDay).sort((a, b) => {
+    // Sort by date descending
+    return new Date(b).getTime() - new Date(a).getTime();
+  });
 
   return (
     <IonPage style={{ paddingTop: marginTop }}>
@@ -288,8 +251,7 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
             marginBottom: 8
           }}
         >
-          <div 
-          style={{
+          <div style={{
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',
@@ -306,109 +268,82 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
                 background: "#fff",
                 marginBottom: 0,
                 flex: 2,
-
               }}
               showClearButton="always"
               showCancelButton="focus"
             />
-
           </div>
 
-
-
-
-
-            <div style={{
+          <div style={{
             display: 'flex',
             flexWrap: 'wrap',
             gap: 2,
-            width:'100%',
+            width: '100%',
             alignItems: 'center',
             background: '#f6f8fa'
           }}>
-
-              <IonButton
-                size="small"
-                color="primary"
-                onClick={() => setSingleDateFilterOpen(true)}
-                className='filterButtons'
+            <IonButton
+              size="small"
+              color="primary"
+              onClick={() => setSingleDateFilterOpen(true)}
+              className='filterButtons'
+            >
+              <IonIcon icon={funnelOutline} style={{ marginRight: 8 }} /> Single Date
+            </IonButton>
+            <IonButton
+              size="small"
+              color="primary"
+              onClick={() => setDateFilterOpen(true)}
+              className='filterButtons'
+            >
+              <IonIcon icon={funnelOutline} style={{ marginRight: 8 }} /> Date Range
+            </IonButton>
+            <div className='filterButtonsSelect'>
+              <IonSelect
+                value={selectedGroup}
+                placeholder="Group"
+                onIonChange={e => setSelectedGroup(e.detail.value)}
+                interface="popover"
+                style={{
+                  color: "#fff",
+                  fontSize: 15,
+                  fontWeight: 500
+                }}
               >
-                <IonIcon icon={funnelOutline} style={{ marginRight: 8 }} /> Single Date
-              </IonButton>
-
-
-
-              <IonButton
-                size="small"
-                color="primary"
-                onClick={() => setDateFilterOpen(true)}
-                className='filterButtons'
-              >
-                <IonIcon icon={funnelOutline} style={{ marginRight: 8 }} /> Date Range
-              </IonButton>
-
-
-
-
-
-              <div className='filterButtonsSelect'>
-                <IonSelect
-                  value={selectedGroup}
-                  placeholder="Group"
-                  onIonChange={e => setSelectedGroup(e.detail.value)}
-                  interface="popover"
-                  style={{
-                    color: "#fff",
-                    fontSize: 15,
-                    fontWeight: 500
-                  }}
-                >
-                  <IonSelectOption value="">Groups</IonSelectOption>
-                  {accounts.map(acc => (
-                    <IonSelectOption key={acc.id} value={acc.id}>
-                      {acc.name}
-                    </IonSelectOption>
-                  ))}
-                </IonSelect>
-              </div>
-              <div className='filterButtonsSelect'>
-                <IonSelect
-                  value={selectedCategory}
-                  placeholder="Category"
-                  onIonChange={e => setSelectedCategory(e.detail.value)}
-                  interface="popover"
-                  color={'primary'}
-                  style={{
-
-                    color: "#fff",
-                    fontSize: 15,
-                    marginLeft: 8,
-                    fontWeight: 500
-                  }}
-                >
-                  <IonSelectOption value="">Categories</IonSelectOption>
-                  {categories.map(cat => (
-                    <IonSelectOption key={cat.id} value={cat.name}>
-                      <IonIcon icon={cat.icon} style={{ color: cat.color, marginRight: 8 }} /> {cat.name}
-                    </IonSelectOption>
-                  ))}
-                </IonSelect>
-              </div>
-
-
-
+                <IonSelectOption value="">Groups</IonSelectOption>
+                {accounts.map(acc => (
+                  <IonSelectOption key={acc.id} value={acc.id}>
+                    {acc.name}
+                  </IonSelectOption>
+                ))}
+              </IonSelect>
             </div>
-
-
-
-
-
+            <div className='filterButtonsSelect'>
+              <IonSelect
+                value={selectedCategory}
+                placeholder="Category"
+                onIonChange={e => setSelectedCategory(e.detail.value)}
+                interface="popover"
+                color={'primary'}
+                style={{
+                  color: "#fff",
+                  fontSize: 15,
+                  marginLeft: 8,
+                  fontWeight: 500
+                }}
+              >
+                <IonSelectOption value="">Categories</IonSelectOption>
+                {categories.map(cat => (
+                  <IonSelectOption key={cat.id} value={cat.name}>
+                    {cat.name}
+                  </IonSelectOption>
+                ))}
+              </IonSelect>
+            </div>
+          </div>
 
           <div className='filterAreaText' style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, marginBottom: 8 }}>
-   
-           
             <button
-              
               onClick={() => {
                 setSearchText('');
                 setSelectedCategory('');
@@ -419,16 +354,14 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
                 setResultText('');
                 loadExpenses();
               }}
-              style={{ background:'#fff', height: 5, width:30, borderRadius: '50%', flex: 1 }}
+              style={{ background: '#fff', height: 30, width: 30, borderRadius: '50%', flex: 1 }}
             >
               <IonIcon icon={closeCircleSharp} style={{ color: "#ff0000", fontSize: 30 }} />
             </button>
-
-                     <span style={{  marginTop:-40,marginLeft:30,fontSize: 16, color: "#e53935", fontWeight: 800, textAlign: 'center', flex: 1 }}>
-              Sum of Filtered Transections = ₹ {totalFilteredExpenses.toFixed(2)}
+            <span style={{ marginTop: -40, marginLeft: 30, fontSize: 16, color: "#e53935", fontWeight: 800, textAlign: 'center', flex: 1 }}>
+              Sum of Filtered Transactions = ₹ {totalFilteredExpenses.toFixed(2)}
             </span>
           </div>
-
         </div>
 
         {loading ? (
@@ -446,153 +379,157 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
                 {resultText || 'All Transactions'}
               </IonText>
             </center>
-            <br/>
+            <br />
             <IonList lines="none">
-              {filteredExpenses.map(expense => {
-                if(!showIncome && expense.type === 'income') return null; // Skip income if showIncome is false
-                const cat = getCategory(expense.category);
-                function confirmDeleteExpense(expense: Expense): void {
-                  setDeletingExpense(expense);
-                  setDeleteModalOpen(true);
-                }
+              {sortedDays.map(day => {
+                const dayExpenses = expensesByDay[day];
+                const dayTotal = dayExpenses
+                  .filter(exp => exp.type === 'expense')
+                  .reduce((sum, exp) => sum + exp.amount, 0);
+
                 return (
-                  <IonItem
-                    key={expense.id}
-                    style={{
-                      borderRadius: 14,
-                      marginBottom: 12,
-                      boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
-                      background: "#fff",
-                      borderLeft: `6px solid ${cat?.color || "#ccc"}`,
-                      transition: "box-shadow 0.2s",
-                      alignItems: 'center',
-                      minHeight: 64,
-                      padding: 0
-                    }}
-                    className="expense-card"
-                  >
+                  <React.Fragment key={day}>
                     <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      width: '100%',
-                      padding: '5px 0'
+                      background: "#e3f2fd",
+                      padding: "8px 16px",
+                      borderRadius: 8,
+                      margin: "16px 0 8px 0",
+                      fontWeight: 700,
+                      color: "#1976d2",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center"
                     }}>
-                      <IonAvatar slot="start" style={{
-                        background: cat?.color || "#eee",
-                        marginLeft: -12,
-                        marginRight: 12,
-                        width: 30,
-                        height: 30,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <IonIcon icon={cat?.icon} style={{ color: "#fff", fontSize: 24 }} />
-                      </IonAvatar>
-                      <div style={{
-                        flex: 1,
-                        minWidth: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center'
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          width: '100%'
-                        }}>
-                          <span style={{
-                            fontWeight: 600,
-                            fontSize: 16,
-                            color: "#222",
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            maxWidth: '60%'
-                          }}>
-                            {expense.category}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 16,
-                              fontWeight: 700,
-                              padding: '4px 14px',
-                              borderRadius: 6,
-                              marginLeft: 8,
-                              backgroundColor: expense.type === 'income'
-                                ? 'var(--ion-color-success, #43a047)'
-                                : 'var(--ion-color-danger, #e53935)',
-                              color: '#fff',
-                              minWidth: 90,
-                              textAlign: 'right',
-                              letterSpacing: 0.5
-                            }}
-                          >
-                            {expense.type === 'income' ? '+' : '-'}₹{expense.amount.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          marginTop: 2
-                        }}>
-                          <span style={{
-                            color: "#666",
-                            fontSize: 14,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            maxWidth: '70%'
-                          }}>
-                            {expense.description}
-                          </span>
-                          <IonNote style={{
-                            fontSize: 12,
-                            color: "#888",
-                            marginLeft: 8,
-                            minWidth: 60,
-                            textAlign: 'right'
-                          }}>
-                            {new Date(expense.date).toLocaleDateString()}
-                          </IonNote>
-                        </div>
-                        {/* Show group name */}
-                        <div style={{
-                          color: "#1976d2",
-                          fontSize: 13,
-                          marginTop: 2,
-                          fontWeight: 500
-                        }}>
-                          {getGroupName(expense.groupId)}
-                        </div>
-                      </div>
-                      <IonButtons slot="end" style={{ marginLeft: 8, alignSelf: 'flex-start' }}>
-                        <IonButton
-                          color="medium"
-                          onClick={() => openEditModal(expense)}
-                          style={{ marginRight: 2 }}
-                        >
-                          <IonIcon icon={pencil} />
-                        </IonButton>
-                        <IonButton
-                          color="danger"
-                          onClick={() => confirmDeleteExpense(expense)}
-                        >
-                          <IonIcon icon={trash} />
-                        </IonButton>
-                      </IonButtons>
+                      <span>{day}</span>
+                      <span>
+                        Total: ₹{dayTotal.toFixed(2)}
+                      </span>
                     </div>
-                  </IonItem>
+                    {dayExpenses.map(expense => {
+                      if (!showIncome && expense.type === 'income') return null;
+                      const cat = getCategory(expense.category);
+                      return (
+                        <IonItem
+                          key={expense.id}
+                          style={{
+                            borderRadius: 14,
+                            marginBottom: 12,
+                            boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
+                            background: "#fff",
+                            borderLeft: `6px solid ${cat?.color || "#ccc"}`,
+                            transition: "box-shadow 0.2s",
+                            alignItems: 'center',
+                            minHeight: 'auto',
+                            padding: 0
+                          }}
+                          className="expense-card"
+                        >
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            width: '100%',
+                            padding: '5px 0'
+                          }}>
+                            <IonAvatar slot="start" style={{
+                              background: cat?.color || "#eee",
+                              marginLeft: -12,
+                              marginRight: 12,
+                              width: 30,
+                              height: 30,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }} />
+                            <div style={{
+                              flex: 1,
+                              minWidth: 0,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center'
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                width: '100%'
+                              }}>
+                                <span style={{
+                                  fontWeight: 600,
+                                  fontSize: 16,
+                                  color: "#222",
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  maxWidth: '60%'
+                                }}>
+                                  {expense.category}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    padding: '4px 14px',
+                                    borderRadius: 6,
+                                    marginLeft: 8,
+                                    backgroundColor: expense.type === 'income'
+                                      ? 'var(--ion-color-success, #43a047)'
+                                      : 'var(--ion-color-danger, #e53935)',
+                                    color: '#fff',
+                                    minWidth: 90,
+                                    textAlign: 'right',
+                                    letterSpacing: 0.5
+                                  }}
+                                >
+                                  {expense.type === 'income' ? '+' : '-'}₹{expense.amount.toFixed(2)}
+                                </span>
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginTop: 2
+                              }}>
+                                <span style={{
+                                  color: "#666",
+                                  fontSize: 14,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  maxWidth: '70%'
+                                }}>
+                                  {expense.description}
+                                </span>
+                                <IonNote style={{
+                                  fontSize: 12,
+                                  color: "#888",
+                                  marginLeft: 8,
+                                  minWidth: 60,
+                                  textAlign: 'right'
+                                }}>
+                                  {new Date(expense.date).toLocaleDateString()}
+                                </IonNote>
+                              </div>
+                              <div style={{
+                                color: "#1976d2",
+                                fontSize: 13,
+                                marginTop: 2,
+                                fontWeight: 500
+                              }}>
+                                {getGroupName(expense.groupId)}
+                              </div>
+                            </div>
+                          </div>
+                        </IonItem>
+                      );
+                    })}
+                  </React.Fragment>
                 );
               })}
             </IonList>
-
             <div className='extraSpace'></div>
           </>
         )}
-        {/* Edit Expense Modal (React Modal) */}
+
+        {/* Edit Expense Modal */}
         <Modal
           isOpen={editModalOpen}
           onRequestClose={() => setEditModalOpen(false)}
@@ -631,7 +568,6 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
               fontWeight: 700,
               letterSpacing: 1,
               fontSize: 22,
-
               marginBottom: 18,
               color: '#1976d2',
               textAlign: 'center'
@@ -643,10 +579,7 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
               }}
               style={{ maxWidth: 400, margin: '0 auto' }}
             >
-              <div style={{
-                background: '#fff',
-                padding: 8
-              }}>
+              <div style={{ background: '#fff', padding: 8 }}>
                 <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Amount</label>
                 <input
                   type="number"
@@ -719,7 +652,14 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
                   }}
                 />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 8, marginBottom: 20, paddingBottom: 20 }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: 12,
+                marginTop: 8,
+                marginBottom: 20,
+                paddingBottom: 20
+              }}>
                 <button
                   type="submit"
                   style={{
@@ -889,7 +829,7 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
               color="primary"
               onClick={() => {
                 setSingleDateFilterOpen(false);
-                setDateFrom(''); // Clear range
+                setDateFrom('');
                 setDateTo('');
                 loadExpenses();
               }}
@@ -982,7 +922,7 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
               color="primary"
               onClick={() => {
                 setDateFilterOpen(false);
-                setSingleDate(''); // Clear single date
+                setSingleDate('');
                 loadExpenses();
               }}
               style={{ borderRadius: 8, fontWeight: 600 }}
@@ -1004,7 +944,6 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
           </div>
         </Modal>
 
-
         <style>
           {`
             .expense-card:hover {
@@ -1013,10 +952,7 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
             }
           `}
         </style>
-
       </IonContent>
-
-
     </IonPage>
   );
 };

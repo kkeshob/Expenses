@@ -194,7 +194,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedGroupId, onSelectGroup, margi
               onClick={() => selectGrouop(group.id!)} // This triggers setSelectedGroupId in parent
               color={selectedGroupId === group.id ? 'primary' : ''}
             >
-              <IonIcon icon={group.icon as any || home} slot="start" />
+
               <IonLabel>{group.name}</IonLabel>
               <IonButton
                 slot="end"

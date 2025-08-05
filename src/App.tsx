@@ -27,14 +27,15 @@ import ExpenseFormModal from './components/ExpenseFormModal';
 import Dashboard from './components/Dashboard';
 import { db, initializeDB } from './db';
 import Categories from './components/Categories';
-import Report from './components/Reports';
+import Report from './components/TodaysExpenses';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import Sidebar from './components/Sidebar';
-import ExpenseList from './components/ExpenseList';
+import ExpenseList from './components/MonthlyExpenseList';
 import AllExpenses from './components/AllExpenses';
 import Modal from 'react-modal';
 import { SafeArea } from 'capacitor-plugin-safe-area';
 import { JSX } from 'react/jsx-runtime';
+import WebBackup from './components/WebBackup';
 
 // Call the element loader after the platform has been bootstrapped
 defineCustomElements(window);
@@ -143,6 +144,38 @@ const App: React.FC = () => {
     <IonApp >
 
       {/* Sidebar */}
+            {/* Toast Notifications */}
+      <ToastContainer
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={true}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        transition={Slide}
+        style={{
+          marginTop: 120,
+          
+        }}
+        toastStyle={{
+          borderRadius: 8,
+          color: "#1976d2",
+          fontWeight: 600,
+          width: "80%",
+          boxShadow: "0 4px 24px rgba(25,118,210,0.13)",
+          zIndex: 99000,
+        }}
+        bodyStyle={{
+          fontSize: 16,
+          fontWeight: 500,
+          letterSpacing: 0.2,
+          zIndex: 99000,
+        }}
+        closeButton={true}
+      />
       <IonMenu className="sidebar" contentId="main-content" type="overlay" side="start" swipeGesture={true}>
         <IonHeader
           style={{
@@ -225,16 +258,11 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <IonPage id="main-content">
-        <IonHeader
-          style={{
-            paddingTop: 'env(safe-area-inset-top, 0px)', // Handles notch if present, 0px otherwise
-            marginTop: 0 // Remove any marginTop
-          }}>
-          <IonToolbar
-            color="primary"
+        <IonHeader>
+          <IonToolbar color="primary"
             style={{
-              background: 'transparent',
-              marginTop: statusBarHeight // Remove this if present
+              paddingTop: 'env(safe-area-inset-top)', // Ensures safe area at top
+              background: 'transparent'
             }}
           >
             <IonButtons slot="start" onClick={loadGroups}>
@@ -244,8 +272,7 @@ const App: React.FC = () => {
               {activeTab}
             </IonTitle>
             <IonButtons slot="end">
-              <IonButton
-                onClick={() => openCategory()}>
+              <IonButton onClick={openCategory}>
                 <IonIcon icon={settingsOutline} />
               </IonButton>
             </IonButtons>
@@ -266,9 +293,14 @@ const App: React.FC = () => {
             <Route exact path="/transactions">
               <AllExpenses selectedGroupId={selectedGroupId} marginTop={statusBarHeight + 40} />
             </Route>
+
+
+
             <Route exact path="/categories">
               <Categories marginTop={statusBarHeight + 40} />
             </Route>
+
+
             <Redirect exact from="/" to="/dashboard" />
           </IonRouterOutlet>
 
@@ -334,36 +366,7 @@ const App: React.FC = () => {
       </IonPage>
 
 
-      {/* Toast Notifications */}
-      <ToastContainer
-        position="top-center"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        transition={Slide}
-        style={{
-          marginTop: 120,
-          zIndex: 2000,
-        }}
-        toastStyle={{
-          borderRadius: 8,
-          color: "#1976d2",
-          fontWeight: 600,
-          width: "80%",
-          boxShadow: "0 4px 24px rgba(25,118,210,0.13)",
-        }}
-        bodyStyle={{
-          fontSize: 16,
-          fontWeight: 500,
-          letterSpacing: 0.2
-        }}
-        closeButton={true}
-      />
+
       {/* Name Modal */}
       <IonModal isOpen={showNameModal} backdropDismiss={false}>
         <IonHeader>
