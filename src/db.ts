@@ -16,7 +16,8 @@ export interface Expense {
   description: string;
   date: Date;
   type: 'income' | 'expense';
-  groupId?: number; // <-- Add groupId for expense grouping
+  groupId?: number;
+  paymentType?: 'cash' | 'credit' | 'e-cash'; // <-- Added field for payment type
 }
 
 export interface Account {
@@ -29,19 +30,20 @@ export class ExpenseDatabase extends Dexie {
   categories: Dexie.Table<Category, number>;
   expenses: Dexie.Table<Expense, number>;
   accounts: Dexie.Table<Account, number>;
+  groups: any;
 
   constructor() {
     super('ExpenseDatabase', { addons: [Dexie.Observable] });
 
-    // Upgrade to version 2: add accounts table and groupId to expenses
-    this.version(2).stores({
+    // Upgrade to version 3: add accounts table and groupId to expenses
+    this.version(3).stores({
       categories: '++id, &name, type',
-      expenses: '++id, amount, category, description, date, type, groupId',
+      expenses: '++id, amount, category, description, date, type, groupId, paymentType', // <-- Added paymentType
       accounts: '++id,&name,icon'
     }).upgrade(tx => {
-      // Add groupId to existing expenses if needed (optional)
+      // Add paymentType to existing expenses if needed (optional)
       return tx.table('expenses').toCollection().modify(exp => {
-        if (exp.groupId === undefined) exp.groupId = null;
+        if (exp.paymentType === undefined) exp.paymentType = 'cash';
       });
     });
 

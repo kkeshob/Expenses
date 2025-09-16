@@ -319,10 +319,23 @@ const Report: React.FC<ReportProps> = ({ marginTop }) => {
                           minWidth: 60,
                           textAlign: 'right'
                         }}>
-                  
                           {new Date(expense.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </IonNote>
                       </div>
+                      {/* Show payment type if present */}
+                      {expense.paymentType && (
+                        <div style={{
+                          color: "#e53935",
+                          fontWeight: 700,
+                          fontSize: 13,
+                          display: "inline-block",
+                          width: "fit-content"
+                        }}>
+                          {expense.paymentType === 'cash' && 'Cash'}
+                          {expense.paymentType === 'credit' && 'Credit'}
+                          {expense.paymentType === 'e-cash' && 'E-Cash'}
+                        </div>
+                      )}
                     </div>
                     <IonButtons slot="end" style={{ marginLeft: 8, alignSelf: 'flex-start' }}>
                       <IonButton

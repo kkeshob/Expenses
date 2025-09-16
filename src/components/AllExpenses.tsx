@@ -24,6 +24,7 @@ import {
   IonButtons,
   IonIcon
 } from '@ionic/react';
+import { trash, pencil } from 'ionicons/icons';
 import { funnelOutline, closeCircleSharp } from 'ionicons/icons';
 import { db, Expense, Category } from '../db';
 import { toast } from 'react-toastify';
@@ -61,6 +62,11 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
   const [dateTo, setDateTo] = useState<string>('');
   const [singleDate, setSingleDate] = useState<string>('');
   const [singleDateFilterOpen, setSingleDateFilterOpen] = useState(false);
+  const [activeExpenseId, setActiveExpenseId] = useState<number | null>(null);
+  const [actionModalOpen, setActionModalOpen] = useState(false);
+  const [actionExpense, setActionExpense] = useState<Expense | null>(null);
+
+  
 
   const showIncome = localStorage.getItem('show_income') === null
     ? true
@@ -221,16 +227,21 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
 
   const netBalance = showIncome ? (totalIncome - totalFilteredExpenses) : null;
 
-  // Group filteredExpenses by date
+  // Sort all filtered expenses by date descending before grouping
+  const sortedExpenses = [...filteredExpenses].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  // Group sorted expenses by day
   const expensesByDay: { [date: string]: Expense[] } = {};
-  filteredExpenses.forEach(exp => {
+  sortedExpenses.forEach(exp => {
     const dateStr = new Date(exp.date).toLocaleDateString();
     if (!expensesByDay[dateStr]) expensesByDay[dateStr] = [];
     expensesByDay[dateStr].push(exp);
   });
 
+  // Sort days descending (newest first)
   const sortedDays = Object.keys(expensesByDay).sort((a, b) => {
-    // Sort by date descending
     return new Date(b).getTime() - new Date(a).getTime();
   });
 
@@ -405,9 +416,11 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
                         Total: ₹{dayTotal.toFixed(2)}
                       </span>
                     </div>
-                    {dayExpenses.map(expense => {
+                    {dayExpenses.map((expense, idx) => {
                       if (!showIncome && expense.type === 'income') return null;
                       const cat = getCategory(expense.category);
+                      // Serial number: global index in sortedExpenses
+                      const serialNo = sortedExpenses.findIndex(e => e.id === expense.id) + 1;
                       return (
                         <IonItem
                           key={expense.id}
@@ -423,6 +436,15 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
                             padding: 0
                           }}
                           className="expense-card"
+                          onPointerDown={e => {
+                            const timer = setTimeout(() => {
+                              setActionExpense(expense);
+                              setActionModalOpen(true);
+                            }, 600);
+                            const clearTimer = () => clearTimeout(timer);
+                            e.target.addEventListener('pointerup', clearTimer, { once: true });
+                            e.target.addEventListener('pointerleave', clearTimer, { once: true });
+                          }}
                         >
                           <div style={{
                             display: 'flex',
@@ -430,16 +452,22 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
                             width: '100%',
                             padding: '5px 0'
                           }}>
+                            {/* Serial Number inside Avatar */}
                             <IonAvatar slot="start" style={{
                               background: cat?.color || "#eee",
-                              marginLeft: -12,
+                              
                               marginRight: 12,
-                              width: 30,
-                              height: 30,
+                              width: 32,
+                              height: 32,
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: 'center'
-                            }} />
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              color: "#fff",
+                              fontSize: 16
+                            }}>
+                              {serialNo}
+                            </IonAvatar>
                             <div style={{
                               flex: 1,
                               minWidth: 0,
@@ -515,8 +543,42 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
                                 fontWeight: 500
                               }}>
                                 {getGroupName(expense.groupId)}
+                                {/* Show payment type if present */}
+                                {expense.paymentType && (
+                                  <span style={{
+                                    color: "#e53935",
+                                    fontWeight: 700,
+                                    fontSize: 13,
+                                    marginLeft: 12
+                                  }}>
+                                    {expense.paymentType === 'cash' && 'Cash'}
+                                    {expense.paymentType === 'credit' && 'Credit'}
+                                    {expense.paymentType === 'e-cash' && 'E-Cash'}
+                                  </span>
+                                )}
                               </div>
                             </div>
+                            {/* Show buttons only if long-pressed */}
+                            {activeExpenseId === expense.id && (
+                              <IonButtons slot="end" style={{ marginLeft: 8, alignSelf: 'flex-start' }}>
+                                <IonButton
+                                  color="medium"
+                                  onClick={() => openEditModal(expense)}
+                                  style={{ marginRight: 2 }}
+                                >
+                                  <IonIcon icon={pencil} />
+                                </IonButton>
+                                <IonButton
+                                  color="danger"
+                                  onClick={() => {
+                                    setDeletingExpense(expense);
+                                    setDeleteModalOpen(true);
+                                  }}
+                                >
+                                  <IonIcon icon={trash} />
+                                </IonButton>
+                              </IonButtons>
+                            )}
                           </div>
                         </IonItem>
                       );
@@ -940,6 +1002,67 @@ const AllExpenses: React.FC<AllExpensesProps> = ({ selectedGroupId, marginTop })
               style={{ borderRadius: 8, fontWeight: 600 }}
             >
               Clear
+            </IonButton>
+          </div>
+        </Modal>
+
+        {/* Action Modal for Edit/Delete */}
+        <Modal
+          isOpen={actionModalOpen}
+          onRequestClose={() => setActionModalOpen(false)}
+          contentLabel="Transaction Actions"
+          style={{
+            overlay: {
+              backgroundColor: 'rgba(25,118,210,0.13)',
+              zIndex: 1200,
+              backdropFilter: 'blur(2px)'
+            },
+            content: {
+              maxWidth: 320,
+              width: '90vw',
+              top: '50%',
+              left: '50%',
+              right: 'auto',
+              bottom: 'auto',
+              transform: 'translate(-50%, -50%)',
+              background: "#fff",
+              borderRadius: 18,
+              boxShadow: "0 8px 36px 0 rgba(25, 118, 210, 0.18)",
+              padding: 24,
+              border: 'none',
+              minHeight: 0,
+              overflow: 'visible'
+            }
+          }}
+        >
+          <h3 style={{ color: '#1976d2', fontWeight: 700, marginBottom: 18, textAlign: 'center' }}>
+            Transaction Actions
+          </h3>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
+            <IonButton
+              color="medium"
+              onClick={() => {
+                setActionModalOpen(false);
+                if (actionExpense) openEditModal(actionExpense);
+              }}
+              style={{ borderRadius: 8, fontWeight: 600 }}
+            >
+              <IonIcon icon={pencil} style={{ marginRight: 8 }} />
+              Edit
+            </IonButton>
+            <IonButton
+              color="danger"
+              onClick={() => {
+                setActionModalOpen(false);
+                if (actionExpense) {
+                  setDeletingExpense(actionExpense);
+                  setDeleteModalOpen(true);
+                }
+              }}
+              style={{ borderRadius: 8, fontWeight: 600 }}
+            >
+              <IonIcon icon={trash} style={{ marginRight: 8 }} />
+              Delete
             </IonButton>
           </div>
         </Modal>

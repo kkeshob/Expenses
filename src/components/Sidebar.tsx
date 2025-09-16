@@ -70,8 +70,12 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedGroupId, onSelectGroup, margi
   useEffect(() => {
     if (selectedGroupId !== null) {
       localStorage.setItem('selectedGroupId', String(selectedGroupId));
+      const selectedGroupObj = groups.find(g => g.id === selectedGroupId);
+      if (selectedGroupObj) {
+        localStorage.setItem('selectedGroupName', selectedGroupObj.name);
+      }
     }
-  }, [selectedGroupId]);
+  }, [selectedGroupId, groups]);
 
   // Helper to get selected group object
   const selectedGroup = groups.find(g => g.id === selectedGroupId) || groups[0];

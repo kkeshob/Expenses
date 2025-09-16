@@ -55,6 +55,7 @@ const App: React.FC = () => {
   const history = useHistory();
   const [statusBarHeight, setStatusBarHeight] = useState(0);
   const tabBarRef = useRef<HTMLIonTabBarElement>(null);
+  const [selectedGroupName, setSelectedGroupName] = useState<string | null>(localStorage.getItem('selectedGroupName'));
 
   useEffect(() => {
     initializeDB();
@@ -62,6 +63,7 @@ const App: React.FC = () => {
     SafeArea.getStatusBarHeight().then((info) => {
       setStatusBarHeight(info.statusBarHeight);
     });
+    StatusBar.setOverlaysWebView({ overlay: true });
     StatusBar.setStyle({ style: Style.Light });
     StatusBar.show();
     StatusBar.setBackgroundColor({ color: '#1a65eb' });
@@ -81,7 +83,24 @@ const App: React.FC = () => {
       setExpGroups(allGroups);
     }
     fetchGroups();
-  }, []);
+
+    // Listen for changes in localStorage for selectedGroupName
+    const handleStorageChange = () => {
+      setSelectedGroupName(localStorage.getItem('selectedGroupName'));
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // Also update when Sidebar changes group (in same tab)
+    const interval = setInterval(() => {
+      const name = localStorage.getItem('selectedGroupName');
+      if (name !== selectedGroupName) setSelectedGroupName(name);
+    }, 500);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [selectedGroupName]);
 
   const handleSaveName = () => {
     if (tempName.trim()) {
@@ -276,28 +295,32 @@ const App: React.FC = () => {
                 <IonIcon icon={settingsOutline} />
               </IonButton>
             </IonButtons>
+            <br />
+            <center style={{ fontSize: 10, fontWeight: 500, opacity: 0.8, marginTop: 8 }}>
+              {selectedGroupName}
+            </center> 
           </IonToolbar>
         </IonHeader>
 
         <IonTabs>
           <IonRouterOutlet>
             <Route exact path="/dashboard">
-              <Dashboard marginTop={statusBarHeight + 40} />
+              <Dashboard marginTop={55} />
             </Route>
             <Route exact path="/expenses">
-              <ExpenseList selectedGroupId={selectedGroupId} marginTop={statusBarHeight + 40} />
+              <ExpenseList selectedGroupId={selectedGroupId} marginTop={55} />
             </Route>
             <Route exact path="/report">
-              <Report marginTop={statusBarHeight + 40} />
+              <Report marginTop={55} />
             </Route>
             <Route exact path="/transactions">
-              <AllExpenses selectedGroupId={selectedGroupId} marginTop={statusBarHeight + 40} />
+              <AllExpenses selectedGroupId={selectedGroupId} marginTop={55 } />
             </Route>
 
 
 
             <Route exact path="/categories">
-              <Categories marginTop={statusBarHeight + 40} />
+              <Categories marginTop={55} />
             </Route>
 
 

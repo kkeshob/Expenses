@@ -26,6 +26,7 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [modalTop, setModalTop] = useState('40%');
   const [modalHeeight, setModalHeight] = useState('58vh');
+  const [paymentType, setPaymentType] = useState<'cash' | 'credit' | 'e-cash'>('cash');
 
 
   // Load categories only once
@@ -55,9 +56,7 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
     }
   }, [type, categories]);
 
-
-
-
+  const DEFAULT_CREDIT_ACCOUNT_NAME = "Expenses In Credit";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,33 +73,54 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       return;
     }
 
-    // 2. Get groupId: use selectedGroupId or fallback to default from localStorage
-    let groupId = Number(
-      localStorage.getItem('selectedGroupId')
-    );
-    if (!groupId) {
-      // Try to get default group from localStorage
-     
-      groupId = 1;
+    // Get selected group/account
+    let accountId = Number(localStorage.getItem('selectedGroupId'));
+    if (!accountId) accountId = 1;
+
+    // If paymentType is credit, ensure "Expenses In Credit" account exists
+    let creditAccountId: number | null = null;
+    if (paymentType === 'credit') {
+      let creditAccount = await db.accounts.where('name').equals(DEFAULT_CREDIT_ACCOUNT_NAME).first();
+      if (!creditAccount) {
+        creditAccountId = await db.accounts.add({
+          name: DEFAULT_CREDIT_ACCOUNT_NAME,
+          icon: 'card',
+        });
+      } else {
+        creditAccountId = creditAccount.id!;
+      }
     }
 
     try {
-      // 3. Save transaction with groupId
+      // Always add to selected group/account
       await db.expenses.add({
         amount: parsedAmount,
         category: category.name,
         description,
         date: new Date(date),
         type,
-        groupId
+        groupId: accountId,
+        paymentType
       });
 
-      // Optionally, also save to localStorage for quick acc
+      // If paymentType is credit, also add to "Expenses In Credit" account
+      if (paymentType === 'credit' && creditAccountId && creditAccountId !== accountId) {
+        await db.expenses.add({
+          amount: parsedAmount,
+          category: category.name,
+          description: `[Credit] ${description}`,
+          date: new Date(date),
+          type,
+          groupId: creditAccountId,
+          paymentType
+        });
+      }
 
       setAmount('');
       setDescription('');
       setDate(new Date().toISOString());
       setType('expense');
+      setPaymentType('cash');
       toast.success('Expense added successfully!');
       if (onExpenseAdded) onExpenseAdded();
       onRequestClose();
@@ -376,6 +396,33 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
 
                   onBlur={() => setModalTop('40%')}
                 />
+              </div>
+
+              {/* Payment Type */}
+              <div style={{
+                borderRadius: 12,
+                width: '100%',
+                boxSizing: 'border-box',
+                marginBottom: 10
+              }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6, color: '#222' }}>Payment Type</label>
+                <select
+                  value={paymentType}
+                  onChange={e => setPaymentType(e.target.value as 'cash' | 'credit' | 'e-cash')}
+                  style={{
+                    width: '100%',
+                    borderRadius: 8,
+                    border: '1.5px solid #90caf9',
+                    padding: '10px 8px',
+                    background: "#f6f8fa",
+                    color: "#1976d2",
+                    fontSize: 16
+                  }}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="credit">Credit</option>
+                  <option value="e-cash">E-Cash</option>
+                </select>
               </div>
 
               {/* Action Buttons */}

@@ -119,7 +119,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
     if (deletingExpense && deletingExpense.id !== undefined) {
       try {
         await db.expenses.delete(deletingExpense.id);
-        setExpenses(expenses.filter(exp => exp.id !== deletingExpense.id));
         toast.success('Transaction deleted successfully');
       } catch (error) {
         toast.error(`Error deleting transaction: ${error}`);
@@ -852,6 +851,28 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ selectedGroupId, marginTop })
                               }}>
                                 {new Date(expense.date).toLocaleDateString()}
                               </IonNote>
+                            </div>
+                            <div style={{
+                              color: "#1976d2",
+                              fontSize: 13,
+                              marginTop: 2,
+                              fontWeight: 500
+                            }}>
+                              {getGroupName(expense.groupId, accounts)}
+                              {/* Show payment type if present */}
+                              {expense.paymentType && (
+                                <span style={{
+                                  marginLeft: 12,
+                                  color: "#e53935",
+                                  fontWeight: 700,
+                                  fontSize: 13,
+                    
+                                }}>
+                                  {expense.paymentType === 'cash' && 'Cash'}
+                                  {expense.paymentType === 'credit' && 'Credit'}
+                                  {expense.paymentType === 'e-cash' && 'E-Cash'}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <IonButtons slot="end" style={{ marginLeft: 8, alignSelf: 'flex-start' }}>

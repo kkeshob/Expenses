@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonGrid, IonRow, IonCol, IonContent, IonPage, IonRefresher, IonRefresherContent, useIonToast, IonLabel } from '@ionic/react';
+import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonGrid, IonRow, IonCol, IonContent, IonPage, IonRefresher, IonRefresherContent, useIonToast, IonLabel, IonSpinner } from '@ionic/react';
 import { Pie, Bar } from 'react-chartjs-2';
 import { db, Expense } from '../db';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
+import { toast } from 'react-toastify';
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
 function debounce<T extends (...args: any[]) => void>(fn: T, delay: number) {
@@ -23,6 +24,10 @@ const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
   const [currentBalance, setCurrentBalance] = useState<number>(0); // NEW
   const [loading, setLoading] = useState(true);
   const [present] = useIonToast();
+  const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(
+    localStorage.getItem('selectedGroupId') ? Number(localStorage.getItem('selectedGroupId')) : null
+  );
 
   const showIncome = localStorage.getItem('show_income') === null
     ? true
@@ -38,37 +43,68 @@ const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
     return { start, end };
   }
 
-  // Efficient data loader: only current month, balance adjusted by previous month
+
+
+
+  const loadExpenses = async () => {
+    setLoading(true);
+    try {
+      let totalExpenses: Expense[] = [];
+
+      totalExpenses = await db.expenses.toArray();
+
+      setAllExpenses(totalExpenses);
+    } catch (error) {
+      toast.error(`Error loading expenses: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadExpenses();
+    // eslint-disable-next-line
+  }, []);
+
+
+
+
+
+
+  // Combine all data loading into one function
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // Calculate carry forward as the sum of all previous months' net balances
-      const { start } = getMonthRange(0); // Start of current month
-      const allPrevExpenses = await db.expenses
-        .where('date')
-        .below(start.toISOString())
-        .toArray();
+      const { start, end } = getMonthRange(0);
 
+      // Fetch all expenses in one go
+      const all = await db.expenses.toArray();
+
+      // Calculate carry forward
       let carryForward = 0;
-      for (const e of allPrevExpenses) {
-        if (e.type === 'income') carryForward += e.amount;
-        else if (e.type === 'expense') carryForward -= e.amount;
-      }
+      all.forEach(e => {
+        const expDate = new Date(e.date);
+        if (expDate < start && (selectedGroupId === null ? true : e.groupId === selectedGroupId)) {
+          if (e.type === 'income') carryForward += e.amount;
+          else if (e.type === 'expense') carryForward -= e.amount;
+        }
+      });
       setPrevClosingBalance(carryForward);
 
-      // Current month
-      const { start: currStart, end: currEnd } = getMonthRange(0);
-      const monthExpenses = await db.expenses
-        .where('date')
-        .between(currStart.toISOString(), currEnd.toISOString(), true, true)
-        .toArray();
+      // Filter current month and selected group
+      const monthExpenses = all.filter(exp => {
+        const expDate = new Date(exp.date);
+        return expDate >= start && expDate <= end &&
+          (selectedGroupId === null ? true : exp.groupId === selectedGroupId);
+      });
       setExpenses(monthExpenses);
 
+      // Calculate totals for selected group
       let incomeTotal = 0, expenseSum = 0;
-      for (const e of monthExpenses) {
+      monthExpenses.forEach(e => {
         if (e.type === 'income') incomeTotal += e.amount;
         else if (e.type === 'expense') expenseSum += e.amount;
-      }
+      });
       setIncome(incomeTotal);
       setExpenseTotal(expenseSum);
       setCurrentBalance(carryForward + incomeTotal - expenseSum);
@@ -83,7 +119,7 @@ const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
     } finally {
       setLoading(false);
     }
-  }, [present]);
+  }, [present, selectedGroupId]);
 
   useEffect(() => {
     loadData();
@@ -98,18 +134,31 @@ const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
     });
   };
 
-  // Only include income if showIncome is true
-  const filteredExpenses = showIncome
-    ? expenses
-    : expenses.filter(e => e.type !== 'income');
+  // Only show transactions for selected group
+  const filteredExpenses = expenses.filter(exp =>
+    selectedGroupId === null ? true : exp.groupId === selectedGroupId
+  );
 
-  // Expense by category
   const expenseByCategory = filteredExpenses
     .filter(e => e.type === 'expense')
     .reduce((acc, e) => {
       acc[e.category] = (acc[e.category] || 0) + e.amount;
       return acc;
     }, {} as Record<string, number>);
+
+  const pieData = {
+    labels: Object.keys(expenseByCategory),
+    datasets: [
+      {
+        data: Object.values(expenseByCategory),
+        backgroundColor: [
+          "#1976d2", "#e53935", "#43a047", "#ffb300", "#8e24aa", "#00bcd4", "#fbc02d", "#d84315"
+        ],
+        borderWidth: 2,
+        borderColor: "#fff"
+      }
+    ]
+  };
 
   // Expense by group (if group property exists)
   const expenseByGroup = filteredExpenses
@@ -120,47 +169,118 @@ const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
       return acc;
     }, {} as Record<string, number>);
 
-  const pieColors = [
-    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-    '#FF9F40', '#8AC24A', '#607D8B', '#E91E63', '#9C27B0'
-  ];
+  // Group expenses by day and sum expenses for each day
+  const dailyTotals: { [date: string]: number } = {};
+  filteredExpenses.forEach(exp => {
+    if (exp.type === 'expense') {
+      const dayStr = new Date(exp.date).toLocaleDateString();
+      dailyTotals[dayStr] = (dailyTotals[dayStr] || 0) + exp.amount;
+    }
+  });
 
-  const pieData = {
-    labels: Object.keys(expenseByCategory),
+  // Sort days ascending
+  const sortedDays = Object.keys(dailyTotals).sort(
+    (a, b) => new Date(a).getTime() - new Date(b).getTime()
+  );
+
+  // Helper to get color by amount
+  function getBarColor(value: number, min: number, max: number, index: number, total: number) {
+  // Map value to a hue: 120 (green) to 0 (red)
+  const ratio = (value - min) / (max - min || 1);
+  const hue = 120 - ratio * 120; // 120=green, 0=red
+  // Make each bar a bit different by shifting hue per index
+  const uniqueHue = (hue + (index * (360 / total))) % 360;
+  return `hsl(${uniqueHue}, 85%, 55%)`;
+}
+
+  // Prepare bar chart data for daily expenses with dynamic colors
+  const minDaily = Math.min(...sortedDays.map(day => dailyTotals[day]));
+  const maxDaily = Math.max(...sortedDays.map(day => dailyTotals[day]));
+  const dailyBarData = {
+    labels: sortedDays,
     datasets: [
       {
-        data: Object.values(expenseByCategory),
-        backgroundColor: pieColors,
-        hoverBackgroundColor: pieColors
+        label: 'Daily Expenses',
+        data: sortedDays.map(day => dailyTotals[day]),
+        backgroundColor: sortedDays.map((day, idx) =>
+          getBarColor(dailyTotals[day], minDaily, maxDaily, idx, sortedDays.length)
+        ),
+        borderColor: sortedDays.map((day, idx) =>
+          getBarColor(dailyTotals[day], minDaily, maxDaily, idx, sortedDays.length)
+        ),
+        borderWidth: 0,
+        borderRadius: 0,
+        barPercentage: 0.7,
+        categoryPercentage: 0.7,
+        hoverBackgroundColor: sortedDays.map((day, idx) =>
+          getBarColor(dailyTotals[day], minDaily, maxDaily, idx, sortedDays.length)
+        )
       }
     ]
   };
 
-  const barData = {
-    labels: ['Income', 'Expenses', 'Prev. Closing', 'Current Balance'],
-    datasets: [
-      {
-        label: 'Amount',
-        data: showIncome ? [income, expenseTotal, prevClosingBalance, currentBalance] : [0, expenseTotal, prevClosingBalance, currentBalance],
-        backgroundColor: [
-          'rgba(75, 192, 192, 0.7)',
-          'rgba(255, 99, 132, 0.7)',
-          'rgba(255, 206, 86, 0.7)',
-          'rgba(54, 162, 235, 0.7)'
-        ],
-        borderColor: [
-          'rgba(75, 192, 192, 1)',
-          'rgba(255, 99, 132, 1)',
-          'rgba(255, 206, 86, 1)',
-          'rgba(54, 162, 235, 1)'
-        ],
-        borderWidth: 2,
-        borderRadius: 12,
-        barPercentage: 0.6,
-        categoryPercentage: 0.5
+  const dailyBarOptions = {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: function (context: any) {
+            return `₹${context.parsed.y.toLocaleString()}`;
+          }
+        },
+        backgroundColor: '#fff',
+        titleColor: '#e53935',
+        bodyColor: '#222',
+        borderColor: '#e53935',
+        borderWidth: 1,
+        padding: 12,
+        cornerRadius: 8,
+        shadowOffsetX: 2,
+        shadowOffsetY: 2,
+        shadowBlur: 8,
+        shadowColor: 'rgba(229,57,53,0.15)'
       }
-    ]
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: { color: "#888", font: { size: 14, weight: "bold" } },
+        grid: { color: "#f3f3f3" }
+      },
+      x: {
+        ticks: { color: "#888", font: { size: 12, weight: "bold" } },
+        grid: { color: "#f3f3f3" }
+      }
+    },
+    animation: {
+      duration: 1200,
+      easing: 'easeOutQuart'
+    }
   };
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const storedId = localStorage.getItem('selectedGroupId');
+      setSelectedGroupId(storedId ? Number(storedId) : null);
+    };
+    window.addEventListener('storage', handleStorage);
+
+    // Also poll for changes in same tab (Sidebar updates localStorage directly)
+    const interval = setInterval(() => {
+      const storedId = localStorage.getItem('selectedGroupId');
+      if (
+        (storedId ? Number(storedId) : null) !== selectedGroupId
+      ) {
+        setSelectedGroupId(storedId ? Number(storedId) : null);
+      }
+    }, 500);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(interval);
+    };
+  }, [selectedGroupId]);
 
   return (
     <IonPage style={{ paddingTop: marginTop }}>
@@ -169,8 +289,9 @@ const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
           <IonRefresherContent />
         </IonRefresher>
         {loading ? (
-          <div className="ion-text-center ion-padding">
-            <IonLabel>Loading...</IonLabel>
+          <div className="ion-text-center ion-padding" style={{ minHeight: 300 }}>
+            <IonSpinner name="crescent" color="primary" style={{ width: 48, height: 48 }} />
+            <IonLabel style={{ display: 'block', marginTop: 16 }}>Loading...</IonLabel>
           </div>
         ) : (
           <IonGrid style={{ margin: '0 auto' /* removed overflow/height for scrolling */ }}>
@@ -178,7 +299,7 @@ const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
               <IonCol size="12" sizeMd="6">
                 <IonCard style={{
                   borderRadius: 18,
-                  boxShadow: "0 2px 16px rgba(0,0,0,0.08)",
+                  boxShadow: "0 2px 16px rgba(0, 4, 255, 0.08)",
                   background: "#fff"
                 }}>
                   <IonCardHeader>
@@ -186,7 +307,7 @@ const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
                   </IonCardHeader>
                   <IonCardContent>
                     <Bar
-                      data={barData}
+                      data={dailyBarData}
                       options={{
                         responsive: true,
                         plugins: { legend: { display: false } },
@@ -197,7 +318,7 @@ const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
                             grid: { color: "#eee" }
                           },
                           x: {
-                            ticks: { color: "#888", font: { size: 14, weight: "bold" } },
+                            ticks: { color: "#888", font: { size: 12, weight: "bold" } },
                             grid: { color: "#eee" }
                           }
                         }
@@ -266,7 +387,8 @@ const Dashboard: React.FC<DashboardProps> = ({ marginTop }) => {
                 </IonCard>
               </IonCol>
             </IonRow>
-<div className='extraSpace'></div>
+
+            <div className='extraSpace'></div>
           </IonGrid>
         )}
         <style>
